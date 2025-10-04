@@ -1,16 +1,17 @@
-/* Torn Targets UI — crisp fetch ring, hover states, rounded table */
-const APP_VERSION = "2.9.3";
+/* Torn Targets UI — table + mobile cards + crisp fetch ring + mobile actions */
+const APP_VERSION = "2.5.0";
 const STORE_KEY = "tornTargets.data.v2";
 const KEY_KEY   = "tornTargets.apiKey.v1";
 const ABOUT_TORN_ID = "3212954";
+const AVATAR_FALLBACK = "assets/profile.png";
 
 /* ---------- State ---------- */
 const state = {
   apiKey: "",
   targets: [],
-  results: {},
+  results: {}, // {id:{name, level, status, last_action, avatar}}
   settings: { concurrency: 2, throttleMs: 1500, useProxy: false, proxyUrl: "" },
-  sort: { key: "id", dir: 1 }, // dir: 1 asc, -1 desc
+  sort: { key: "id", dir: 1 },
   stop: false
 };
 
@@ -29,7 +30,7 @@ const btnAbout=$("#btn-about");
 const statusFilterEl=$("#statusFilter"), searchBoxEl=$("#searchBox");
 const chipsWrap=$("#statusChips");
 
-const emptyGlobal=$("#emptyGlobal"), tableWrap=$("#tableWrap"), tbody=$("#tbody"), grid=$("#grid");
+const tableWrap=$("#tableWrap"), tbody=$("#tbody"), grid=$("#grid");
 const tableEmpty=$("#tableEmpty"), chkAll=$("#chk-all");
 
 const progressWrap=$("#progressWrap"), progressBar=$("#progressBar"), progressText=$("#progressText");
@@ -41,23 +42,76 @@ const btnAddDialog=$("#btn-add-dialog"), btnBulk=$("#btn-bulk"), btnRemove=$("#b
 const loadingOverlay=$("#loadingOverlay");
 
 /* Add Target modal */
+const addDlgEl=$("#addDlg"); const addDlg = new bootstrap.Modal(addDlgEl);
 const singleInput=$("#singleInput"), singleHint=$("#singleHint");
 const bulkText=$("#bulkText"), bulkHint=$("#bulkHint");
 const addConfirm=$("#addConfirm");
 
 /* Legacy bulk modal */
+const bulkDlg = new bootstrap.Modal($("#bulkDlg"));
 const bulkTextLegacy=$("#bulkTextLegacy");
 const bulkConfirmLegacy=$("#bulkConfirmLegacy");
 
 /* Fetch modal */
+const fetchDlgEl = $("#fetchDlg");
+const fetchDlg   = new bootstrap.Modal(fetchDlgEl);
 const ringFg     = $("#ringFg");
 const ringPct    = $("#ringPct");
 const ringSub    = $("#ringSub");
+$("#fetchCancel")?.addEventListener("click", ()=>{ state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); });
 
-/* Offcanvas */
-const offcanvasEl = document.getElementById("sidebarOffcanvas");
+/* API info modal */
+const apiKeyInfoDlg = new bootstrap.Modal($("#apiKeyInfoDlg"));
+$("#keyFocusBtn")?.addEventListener("click", ()=>{
+  apiKeyInfoDlg.hide();
+  // focus the API key field (desktop or offcanvas clone)
+  const off = document.querySelector('#sidebarOffcanvas [data-bind="apiKey"]');
+  const el = apiKeyEl || off;
+  el?.focus();
+});
 
-/* ---------- Status Bar ---------- */
+/* Sort bar (mobile) */
+function ensureSortBar(){
+  if(document.getElementById("sortBar")) return;
+  const scroller = document.querySelector(".board-col");
+  if(!scroller) return;
+  const bar = document.createElement("div");
+  bar.id = "sortBar";
+  bar.innerHTML = `
+    <div class="sortbar d-lg-none">
+      <div class="label"><i class="bi bi-arrow-down-up me-1"></i>
+        <span id="sortBarLabel">Sort: Id ↑</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-ghost btn-sm" data-action="toggle-sort-dir" aria-label="Toggle direction">
+          <i class="bi bi-sort-down"></i>
+        </button>
+        <div class="dropdown">
+          <button class="btn btn-ghost btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-sliders me-1"></i> Choose
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><button class="dropdown-item" data-action="sort-key" data-key="id">Id</button></li>
+            <li><button class="dropdown-item" data-action="sort-key" data-key="name">Name</button></li>
+            <li><button class="dropdown-item" data-action="sort-key" data-key="level">Level</button></li>
+            <li><button class="dropdown-item" data-action="sort-key" data-key="status">Status</button></li>
+            <li><button class="dropdown-item" data-action="sort-key" data-key="last">Last action</button></li>
+          </ul>
+        </div>
+      </div>
+    </div>`;
+  const anchor = document.getElementById("gridScroll");
+  scroller.insertBefore(bar, anchor);
+  updateSortBar();
+}
+function updateSortBar(){
+  const map = {id:"Id", name:"Name", level:"Level", status:"Status", last:"Last action"};
+  const dir = state.sort.dir>0 ? "↑" : "↓";
+  const label = $("#sortBarLabel");
+  if (label) label.replaceChildren(document.createTextNode(`Sort: ${map[state.sort.key]} ${dir}`));
+}
+
+/* Status Bar */
 const statusBarText = $("#statusText");
 const statusBarSaved = $("#savedMeta");
 const statusDot      = $("#statusDot");
@@ -66,16 +120,7 @@ function setStatus(msg, busy=false) {
   if (statusDot) statusDot.style.background = busy ? "#60a5fa" : "#36d39f";
 }
 
-/* Bootstrap-safe modal helpers */
-function modalGetOrCreate(selector){
-  const el = typeof selector === "string" ? $(selector) : selector;
-  if(!el) return null;
-  return bootstrap.Modal.getOrCreateInstance(el);
-}
-function modalShow(selector){ modalGetOrCreate(selector)?.show(); }
-function modalHide(selector){ modalGetOrCreate(selector)?.hide(); }
-
-/* ---------- Theme ---------- */
+/* Theme */
 const THEME_KEY="theme";
 document.querySelectorAll(".theme-choice").forEach(btn=>{
   btn.addEventListener("click",()=>setTheme(btn.dataset.theme||"auto", true));
@@ -94,7 +139,7 @@ function initTheme(){
   const mode = localStorage.getItem(THEME_KEY) || "dark";
   setTheme(mode, false);
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{
-    const m = localStorage.getItem("theme")||"auto";
+    const m = localStorage.getItem(THEME_KEY)||"auto";
     if(m==="auto") setTheme("auto", false);
   });
 }
@@ -112,11 +157,9 @@ function extractIds(input){
   return [...ids];
 }
 function persist(){
-  try{
-    localStorage.setItem(STORE_KEY, JSON.stringify({
-      version:APP_VERSION, targets:state.targets, results:state.results, settings:state.settings
-    }));
-  }catch(e){}
+  localStorage.setItem(STORE_KEY, JSON.stringify({
+    version:APP_VERSION, targets:state.targets, results:state.results, settings:state.settings
+  }));
 }
 function restore(){
   try{
@@ -135,29 +178,50 @@ function restore(){
 }
 function applySettingsToUI(){
   if(concurrencyEl) concurrencyEl.value=String(state.settings.concurrency);
-  if(throttleEl) throttleEl.value=String(state.settings.throttleMs);
-  if(useProxyEl) useProxyEl.checked=state.settings.useProxy;
-  if(proxyUrlEl) proxyUrlEl.value=state.settings.proxyUrl||"";
+  if(throttleEl)    throttleEl.value=String(state.settings.throttleMs);
+  if(useProxyEl)    useProxyEl.checked=state.settings.useProxy;
+  if(proxyUrlEl)    proxyUrlEl.value=state.settings.proxyUrl||"";
 }
-function persistKeyToStorage(){
-  try{
-    const k = (apiKeyEl?.value || "").trim();
-    state.apiKey = k;
-    if(rememberKeyEl?.checked && k){
-      localStorage.setItem(KEY_KEY, k);
-    }else{
-      localStorage.removeItem(KEY_KEY);
-    }
-  }catch(e){}
+function saveKeyMaybe(){
+  // pull value from desktop field if present, else from offcanvas clone
+  let key = apiKeyEl?.value?.trim();
+  if(!key){
+    const off = document.querySelector('#sidebarOffcanvas [data-bind="apiKey"]');
+    key = off?.value?.trim() || "";
+  }
+  const remember = rememberKeyEl?.checked ?? document.querySelector('#sidebarOffcanvas [data-bind="rememberKey"]')?.checked ?? false;
+
+  state.apiKey = key;
+  if(remember && key) localStorage.setItem(KEY_KEY,key);
+  else localStorage.removeItem(KEY_KEY);
+}
+function saveApiAndCloseSidebar(){
+  saveKeyMaybe();
+  closeOffcanvasIfOpen();
+  setStatus(state.apiKey ? "API key saved." : "API key cleared.", false);
+}
+
+/* Helpers for offcanvas */
+function closeOffcanvasIfOpen(){
+  const ocEl = document.getElementById("sidebarOffcanvas");
+  if(!ocEl) return;
+  const inst = bootstrap.Offcanvas.getInstance(ocEl);
+  if(inst) inst.hide();
 }
 function readFromOffcanvasIfPresent(){
-  const oc = document.getElementById("sidebarOffcanvas");
-  if(!oc) return;
-  const cloneApi = oc.querySelector('[data-bind="apiKey"]');
-  const cloneRemember = oc.querySelector('[data-bind="rememberKey"]');
-  if(cloneApi && apiKeyEl) apiKeyEl.value = cloneApi.value;
-  if(cloneRemember && rememberKeyEl) rememberKeyEl.checked = cloneRemember.checked;
+  // copy values from offcanvas into state/UI before actions
+  const offApi = document.querySelector('#sidebarOffcanvas [data-bind="apiKey"]');
+  const offRmb = document.querySelector('#sidebarOffcanvas [data-bind="rememberKey"]');
+  if(offApi){
+    if(apiKeyEl) apiKeyEl.value = offApi.value;
+  }
+  if(offRmb){
+    if(rememberKeyEl) rememberKeyEl.checked = offRmb.checked;
+  }
+  saveKeyMaybe();
 }
+function apiKeyPresent(){ return !!(state.apiKey && state.apiKey.trim()); }
+function showApiKeyInfo(){ apiKeyInfoDlg.show(); }
 
 /* ---------- Layout calc ---------- */
 function setHeights(){
@@ -169,16 +233,6 @@ window.addEventListener("resize", setHeights);
 window.addEventListener("orientationchange", setHeights);
 
 /* ---------- Rendering ---------- */
-function ensureVisibleState(){
-  const hasRows=state.targets.length>0;
-  if(emptyGlobal) emptyGlobal.classList.toggle("d-none", hasRows);
-  if(tableWrap) tableWrap.classList.toggle("d-none", !hasRows);
-  const metaText = hasRows
-    ? `${state.targets.length} target${state.targets.length!==1?'s':''} • last saved ${new Date().toLocaleTimeString()}`
-    : `No data yet`;
-  if(boardMeta) boardMeta.textContent = metaText;
-  if(statusBarSaved) statusBarSaved.textContent = metaText;
-}
 function statusDisplay(s){
   const str=(s?.state||"").toLowerCase();
   if(str.includes("hospital")) return {label:"Hospital", badge:"border-danger-subtle bg-danger-subtle text-danger-emphasis"};
@@ -186,58 +240,29 @@ function statusDisplay(s){
   if(str.includes("abroad")||str.includes("travel")) return {label:"Abroad", badge:"border-info-subtle bg-info-subtle text-info-emphasis"};
   if(str.includes("okay"))     return {label:"Okay", badge:"border-success-subtle bg-success-subtle text-success-emphasis"};
   if(str)                      return {label:s.state, badge:"border-secondary-subtle bg-secondary-subtle text-body"};
-  return {label:"Offline", badge:"border-secondary-subtle bg-secondary-subtle text-body"};
+  return {label:"Offline", badge:"border-secondary-subtle bg-body text-body"};
 }
 function formatLast(last){
   if(!last) return "";
   if(last.relative) return last.relative;
   if(last.status) return last.status;
-  if(last.timestamp) try{ return new Date(last.timestamp*1000).toLocaleString(); }catch{}
+  if(last.timestamp) try{ return `${Math.max(0, Math.floor((Date.now()/1000 - last.timestamp)/86400))} days ago`; }catch{}
   return "";
 }
 function rowData(id){
   const r=state.results[id]||{};
-  const avatar = (r.avatar && String(r.avatar).trim()) ? r.avatar : "assets/profile.png";
-  return { id, name:r.name||"", level:r.level??"", avatar, st:statusDisplay(r.status||{}), last:formatLast(r.last_action) };
+  return { id, name:r.name||"", level:r.level??"", st:statusDisplay(r.status||{}), last:formatLast(r.last_action), avatar:r.avatar||AVATAR_FALLBACK };
 }
-function render(){
-  ensureVisibleState();
-  const filter=statusFilterEl?.value || "all";
-  const term=(searchBoxEl?.value||"").trim().toLowerCase();
-
-  grid?.querySelectorAll("th.sortable").forEach(th=>{
-    th.classList.remove("sort-asc","sort-desc");
-    if(th.dataset.sort===state.sort.key){
-      th.classList.add(state.sort.dir>0?"sort-asc":"sort-desc");
-    }
-  });
-
-  const frag=document.createDocumentFragment(); let visible=0;
-  for(const id of sortedTargets()){
-    const {name,level,st,last,avatar}=rowData(id);
-    if(filter!=="all" && st.label.toLowerCase()!==filter.toLowerCase()) continue;
-    if(term){
-      const hay=(id+" "+(name||"")).toLowerCase();
-      if(!hay.includes(term)) continue;
-    }
-    const avatarHtml = `<img class="avatar" src="${escapeHtml(avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='assets/profile.png';">`;
-    const tr=document.createElement("tr");
-    tr.dataset.id=id;
-    tr.innerHTML=`
-      <td><input type="checkbox" class="rowchk" /></td>
-      <td class="font-monospace cell-id" data-label="ID">#${id}</td>
-      <td class="cell-name" data-label="Name">
-        <span class="name-wrap">${avatarHtml}<span class="name-text">${escapeHtml(name||"")}</span></span>
-      </td>
-      <td class="cell-level" data-label="Level"><span class="lvl-pill">Lv ${escapeHtml(level)}</span></td>
-      <td class="cell-status" data-label="Status"><span class="badge rounded-pill ${st.badge} border">${escapeHtml(st.label)}</span></td>
-      <td class="cell-last" data-label="Last action"><i class="bi bi-clock-history"></i><span>${escapeHtml(last)}</span></td>
-    `;
-    frag.appendChild(tr); visible++;
-  }
-  if(tbody){ tbody.innerHTML=""; tbody.appendChild(frag); }
-  if(tableEmpty) tableEmpty.classList.toggle("d-none", !(state.targets.length>0 && visible===0));
-  updateChipCounts(); persist();
+function ensureVisibleState(){
+  const emptyGlobal=$("#emptyGlobal");
+  const hasRows=state.targets.length>0;
+  emptyGlobal.classList.toggle("d-none", hasRows);
+  tableWrap.classList.toggle("d-none", !hasRows);
+  const metaText = hasRows
+    ? `${state.targets.length} target${state.targets.length!==1?'s':''} • last saved ${new Date().toLocaleTimeString()}`
+    : `No data yet`;
+  boardMeta.textContent = metaText;
+  if (statusBarSaved) statusBarSaved.textContent = metaText;
 }
 function sortedTargets(){
   const arr=[...state.targets];
@@ -249,6 +274,52 @@ function sortedTargets(){
     return String(va).localeCompare(String(vb), undefined, {numeric:true,sensitivity:"base"}) * dir;
   });
 }
+function render(){
+  ensureVisibleState();
+  updateChipCounts();
+  updateSortBar();
+
+  grid.querySelectorAll("th.sortable").forEach(th=>{
+    th.classList.remove("sort-asc","sort-desc");
+    if(th.dataset.sort===state.sort.key){
+      th.classList.add(state.sort.dir>0?"sort-asc":"sort-desc");
+    }
+  });
+
+  const filter=statusFilterEl.value;
+  const term=(searchBoxEl.value||"").trim().toLowerCase();
+
+  const frag=document.createDocumentFragment(); let visible=0;
+  for(const id of sortedTargets()){
+    const {name,level,st,last,avatar}=rowData(id);
+    if(filter!=="all" && st.label.toLowerCase()!==filter.toLowerCase()) continue;
+    if(term){
+      const hay=(id+" "+(name||"")).toLowerCase();
+      if(!hay.includes(term)) continue;
+    }
+    const tr=document.createElement("tr");
+    tr.dataset.id=id;
+    tr.innerHTML=`
+      <td><input type="checkbox" class="rowchk" /></td>
+      <td class="cell-id font-monospace">#${escapeHtml(id)}</td>
+      <td class="cell-name">
+        <span class="name-wrap">
+          <img class="avatar" src="${escapeAttr(avatar)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${AVATAR_FALLBACK}';">
+          <span class="name-text">${escapeHtml(name||"")}</span>
+        </span>
+      </td>
+      <td class="cell-level">${level!==""?`Lv ${escapeHtml(level)}`:""}</td>
+      <td class="cell-status"><span class="badge rounded-pill ${st.badge} border">${escapeHtml(st.label)}</span></td>
+      <td class="cell-last"><i class="bi bi-clock-history"></i><span>${escapeHtml(last)}</span></td>
+    `;
+    frag.appendChild(tr); visible++;
+  }
+  tbody.innerHTML=""; tbody.appendChild(frag);
+  tableEmpty.classList.toggle("d-none", !(state.targets.length>0 && visible===0));
+  persist();
+}
+
+/* chip counts for sidebar filter */
 function updateChipCounts(){
   const c={all:state.targets.length, ok:0,hosp:0,jail:0,travel:0,off:0};
   for(const id of state.targets){
@@ -256,33 +327,38 @@ function updateChipCounts(){
     if(cls.includes("okay")) c.ok++; else if(cls.includes("hospital")) c.hosp++;
     else if(cls.includes("jail")) c.jail++; else if(cls.includes("abroad")) c.travel++; else c.off++;
   }
-  $("#c-all").textContent=c.all; $("#c-ok").textContent=c.ok; $("#c-hosp").textContent=c.hosp;
-  $("#c-jail").textContent=c.jail; $("#c-travel").textContent=c.travel; $("#c-off").textContent=c.off;
+  const allEl = $("#c-all"); if(allEl) allEl.textContent = c.all;
+  const okEl = $("#c-ok"); if(okEl) okEl.textContent = c.ok;
+  const hospEl = $("#c-hosp"); if(hospEl) hospEl.textContent = c.hosp;
+  const jailEl = $("#c-jail"); if(jailEl) jailEl.textContent = c.jail;
+  const travEl = $("#c-travel"); if(travEl) travEl.textContent = c.travel;
+  const offEl = $("#c-off"); if(offEl) offEl.textContent = c.off;
 }
-function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,(m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 
-/* Sorting (desktop header) */
-grid?.querySelectorAll("th.sortable").forEach(th=>{
+function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,(m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function escapeAttr(s){return String(s??"").replace(/"/g,"&quot;")}
+
+/* Sorting */
+grid.querySelectorAll("th.sortable").forEach(th=>{
   th.addEventListener("click",()=>{
     const key=th.dataset.sort;
     state.sort = (state.sort.key===key) ? {key, dir:state.sort.dir*-1} : {key, dir:1};
-    updateMobileSortLabel();
-    render();
+    render(); updateSortBar();
   });
 });
 
 /* Selection + row click */
 chkAll?.addEventListener("change",()=>{
-  tbody?.querySelectorAll(".rowchk").forEach(cb=>cb.checked=chkAll.checked);
+  tbody.querySelectorAll(".rowchk").forEach(cb=>cb.checked=chkAll.checked);
 });
-tbody?.addEventListener("change",(e)=>{
+tbody.addEventListener("change",(e)=>{
   if(!(e.target instanceof HTMLInputElement)) return;
   if(e.target.classList.contains("rowchk")){
     const boxes=[...tbody.querySelectorAll(".rowchk")];
     chkAll.checked = boxes.length>0 && boxes.every(b=>b.checked);
   }
 });
-tbody?.addEventListener("click",(e)=>{
+tbody.addEventListener("click",(e)=>{
   if(e.target.closest("input,button,a,label")) return;
   const tr=e.target.closest("tr"); if(!tr) return;
   const id=tr.dataset.id; if(!id) return;
@@ -290,95 +366,72 @@ tbody?.addEventListener("click",(e)=>{
 });
 
 /* Filters */
-statusFilterEl?.addEventListener("change",()=>{
+statusFilterEl.addEventListener("change",()=>{
   chipsWrap.querySelectorAll(".chip").forEach(c=>c.classList.toggle("active", c.dataset.val===statusFilterEl.value || (statusFilterEl.value==="all" && c.dataset.val==="all")));
   render();
 });
-chipsWrap?.addEventListener("click",(e)=>{
+chipsWrap.addEventListener("click",(e)=>{
   const btn=e.target.closest(".chip"); if(!btn) return;
   chipsWrap.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
   btn.classList.add("active");
-  if(statusFilterEl) statusFilterEl.value=btn.dataset.val || "all";
+  statusFilterEl.value=btn.dataset.val || "all";
   render();
 });
-searchBoxEl?.addEventListener("input",()=>render());
+searchBoxEl.addEventListener("input",()=>render());
 
-/* --- Sidebar & actions --- */
-document.addEventListener("click",(e)=>{
-  const act = e.target.closest("[data-action]")?.dataset.action;
-  if(!act) return;
-
-  if(act==="save-api"){
-    e.preventDefault();
-    saveApiAndCloseSidebar();
-  }else if(act==="open-add"){
-    e.preventDefault();
-    openAddDialog("single", true);
-  }else if(act==="open-bulk"){
-    e.preventDefault();
-    openAddDialog("bulk", true);
-  }
-});
+/* Add / Remove / Clear */
 btnAddDialog?.addEventListener("click",()=>openAddDialog("single", true));
-btnBulk?.addEventListener("click",()=>openAddDialog("bulk", true));
 ctaAdd?.addEventListener("click",()=>openAddDialog("single", false));
-
-function closeOffcanvasIfOpen(){
-  if(!offcanvasEl) return;
-  const inst = bootstrap.Offcanvas.getInstance(offcanvasEl) || bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
-  if(offcanvasEl.classList.contains("show")) inst.hide();
-}
 function openAddDialog(tab="single", fromSidebar=false){
   if(fromSidebar) closeOffcanvasIfOpen();
-  const el = $("#addDlg");
-  if(el?.classList.contains("show")) return;
-
   new bootstrap.Tab(document.querySelector(`[data-bs-target="#${tab==="single"?"singleTab":"bulkTab"}"]`)).show();
-  if(singleInput) singleInput.value="";
-  if(singleHint) singleHint.textContent="Waiting for input…";
-  if(bulkText) bulkText.value="";
-  if(bulkHint) bulkHint.textContent="0 valid IDs detected.";
-  modalShow("#addDlg");
+  singleInput.value=""; singleHint.textContent="Waiting for input…";
+  bulkText.value=""; bulkHint.textContent="0 valid IDs detected.";
+  addDlg.show();
 }
-
 singleInput?.addEventListener("input",()=>{
   const ids=extractIds(singleInput.value);
-  if(singleHint) singleHint.textContent = ids.length ? `Resolved → ${ids.join(", ")}` : `No valid ID found yet. Paste an ID or Torn profile URL.`;
+  singleHint.textContent = ids.length ? `Resolved → ${ids.join(", ")}` : `No valid ID found yet. Paste an ID or Torn profile URL.`;
 });
 bulkText?.addEventListener("input",()=>{
   const ids=extractIds(bulkText.value);
-  if(bulkHint) bulkHint.textContent = `${ids.length} valid ID${ids.length!==1?'s':''} detected.`;
+  bulkHint.textContent = `${ids.length} valid ID${ids.length!==1?'s':''} detected.`;
 });
 addConfirm?.addEventListener("click",async ()=>{
   const activeTab=document.querySelector("#addTabs .nav-link.active")?.getAttribute("data-bs-target")||"#singleTab";
-  const source = activeTab==="#singleTab" ? (singleInput?.value||"") : (bulkText?.value||"");
+  const source = activeTab==="#singleTab" ? singleInput.value : bulkText.value;
   let ids = extractIds(source);
-  if(activeTab==="#singleTab" && !ids.length && state.apiKey && source.trim()){
+
+  // If single tab and no numeric id was found, and there is no API key,
+  // we can't resolve a username → id; show info modal.
+  if(activeTab==="#singleTab" && !ids.length){
+    saveKeyMaybe();
+    if(!apiKeyPresent()){
+      apiKeyInfoDlg.show();
+      return;
+    }
+    // try resolve via search
     addConfirm.disabled=true; addConfirm.textContent="Resolving…";
     const id = await resolveNameToId(source.trim()).catch(()=>null);
     addConfirm.disabled=false; addConfirm.textContent="Add";
     if(id) ids=[id];
   }
-  if(!ids.length){ if(singleHint) singleHint.textContent="No valid IDs found. Try a different input."; return; }
+  if(!ids.length){ singleHint.textContent="No valid IDs found. Try a different input."; return; }
+
   let added=0; for(const id of ids){ if(!state.targets.includes(id)){ state.targets.push(id); added++; } }
-  sortTargets(); render(); modalHide("#addDlg");
+  sortTargets(); render(); addDlg.hide();
+  if(added>0 && state.apiKey) startFetchAll();
   setStatus("Targets updated.", false);
-
-  if(!state.apiKey){ showApiKeyInfo(); } else { startFetchAll(); }
 });
-
-/* Bulk (legacy) */
+btnBulk?.addEventListener("click",()=>openAddDialog("bulk", true));
 bulkConfirmLegacy?.addEventListener("click",()=>{
   const ids=extractIds(bulkTextLegacy.value);
   let added=0; for(const id of ids){ if(!state.targets.includes(id)){ state.targets.push(id); added++; } }
-  bulkTextLegacy.value=""; modalHide("#bulkDlg");
+  bulkTextLegacy.value=""; bulkDlg.hide();
   if(!added) alert("No new IDs found.");
   sortTargets(); render();
   setStatus("Targets updated.", false);
-  if(!state.apiKey) showApiKeyInfo();
 });
-
-/* Remove / Clear */
 btnRemove?.addEventListener("click",()=>{
   const selected=[...tbody.querySelectorAll("tr")].filter(tr=>tr.querySelector(".rowchk")?.checked).map(tr=>tr.dataset.id);
   if(!selected.length) return alert("Select rows to remove.");
@@ -389,7 +442,7 @@ btnRemove?.addEventListener("click",()=>{
 });
 btnClear?.addEventListener("click",()=>{ if(confirm("Clear all targets?")){ state.targets=[]; state.results={}; render(); setStatus("Cleared target list.", false);} });
 
-/* Open/Save file */
+/* Open/Save */
 btnOpen?.addEventListener("click",()=>$("#file").click());
 ctaOpen?.addEventListener("click",()=>$("#file").click());
 $("#file")?.addEventListener("change",async(e)=>{
@@ -418,24 +471,13 @@ function importFromJSON(text){
 }
 
 /* Fetching */
-btnFetch?.addEventListener("click",()=>{
-  readFromOffcanvasIfPresent();
-  if(!apiKeyPresent()) { showApiKeyInfo(); return; }
-  startFetchAll();
-});
-btnStop?.addEventListener("click",()=>{ state.stop=true; setStatus("Stopped by user.", false); modalHide("#fetchDlg"); });
-$("#fetchCancel")?.addEventListener("click", ()=>{ state.stop=true; setStatus("Stopped by user.", false); modalHide("#fetchDlg"); });
-
-btnResetCols?.addEventListener("click",()=>{ /* future column prefs */ });
-
-function apiKeyPresent(){
-  persistKeyToStorage();
-  return !!state.apiKey;
-}
+btnFetch?.addEventListener("click",()=>startFetchAll());
+btnStop?.addEventListener("click",()=>{ state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); });
 
 async function startFetchAll(){
-  persistKeyToStorage();
-  if(!state.apiKey) return;
+  readFromOffcanvasIfPresent();
+  saveKeyMaybe();
+  if(!state.apiKey){ apiKeyInfoDlg.show(); return; }
   if(!state.targets.length) return alert("No targets to fetch.");
 
   state.stop=false;
@@ -453,7 +495,7 @@ async function startFetchAll(){
       await sleep(state.settings.throttleMs);
     }
   };
-  const n=Math.max(1, Math.min(4, parseInt(concurrencyEl?.value,10)||2));
+  const n=Math.max(1, Math.min(4, parseInt(concurrencyEl?.value||state.settings.concurrency,10)||2));
   await Promise.all([...Array(n)].map(()=>worker()));
 
   showLoading(false);
@@ -461,27 +503,27 @@ async function startFetchAll(){
   setStatus("Fetch complete.", false);
 }
 function showLoading(flag){
-  if(progressWrap) progressWrap.classList.toggle("d-none", !flag);
-  if(btnFetch) btnFetch.disabled=flag;
-  if(btnStop) btnStop.disabled=!flag;
+  progressWrap.classList.toggle("d-none", !flag);
+  if (btnFetch) btnFetch.disabled = flag;
+  if (btnStop)  btnStop.disabled  = !flag;
 
   if(flag){
     updateRing(0);
-    if(ringPct) ringPct.textContent="0%";
-    if(ringSub) ringSub.textContent="Fetching…";
-    modalShow("#fetchDlg");
+    ringPct.textContent="0%";
+    ringSub.textContent="Fetching…";
+    fetchDlg.show();
   }else{
-    modalHide("#fetchDlg");
+    fetchDlg.hide();
   }
   loadingOverlay?.classList.add("d-none");
 }
 function setProgress(pct, done=0, total=0){
   const p = Math.max(0, Math.min(100, Math.round(pct)));
-  if(progressBar) progressBar.style.width=`${p}%`;
-  if(progressText) progressText.textContent=`${p}%`;
+  progressBar.style.width=`${p}%`;
+  progressText.textContent=`${p}%`;
   updateRing(p);
-  if(ringPct) ringPct.textContent = `${p}%`;
-  if(total && ringSub){ ringSub.textContent = `${done} / ${total}`; }
+  ringPct.textContent = `${p}%`;
+  if(total){ ringSub.textContent = `${done} / ${total}`; }
 }
 function updateRing(p){
   if(!ringFg) return;
@@ -500,34 +542,30 @@ async function fetchOne(id){
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data=await res.json();
     if(data?.error){
-      state.results[id]={ name:"", level:"", avatar:"", status:{state:`Error ${data.error.error}`}, last_action:{} };
+      state.results[id]={ name:"", level:"", status:{state:`Error ${data.error.error}`}, last_action:{}, avatar: AVATAR_FALLBACK };
     }else{
       state.results[id]={
-        name:data.name,
-        level:data.level,
-        avatar: data.profile_image || "",
-        status:data.status,
-        last_action:data.last_action
+        name:data.name, level:data.level, status:data.status, last_action:data.last_action,
+        avatar: data.profile_image || AVATAR_FALLBACK
       };
     }
     renderRow(id);
   }catch(e){
     console.error("Fetch failed",id,e);
-    state.results[id]={ name:"", level:"", avatar:"", status:{state:"Offline"}, last_action:{} };
+    state.results[id]={ name:"", level:"", status:{state:"Offline"}, last_action:{}, avatar: AVATAR_FALLBACK };
     renderRow(id);
   }
 }
 function renderRow(id){
-  const tr=tbody?.querySelector(`tr[data-id="${CSS.escape(id)}"]`); if(!tr) return;
+  const tr=tbody.querySelector(`tr[data-id="${CSS.escape(id)}"]`); if(!tr) return;
   const r=rowData(id); const tds=tr.children;
-  const nameCell = tds[2].querySelector(".name-text");
-  const avatarImg = tds[2].querySelector(".avatar");
-  if(nameCell) nameCell.textContent = r.name || "";
-  if(avatarImg){
-    avatarImg.src = r.avatar || "assets/profile.png";
-    avatarImg.onerror = function(){ this.onerror=null; this.src="assets/profile.png"; };
-  }
-  tds[3].innerHTML=`<span class="lvl-pill">Lv ${escapeHtml(r.level)}</span>`;
+  tds[1].innerHTML=`#${escapeHtml(id)}`; // ID
+  tds[2].innerHTML=`
+    <span class="name-wrap">
+      <img class="avatar" src="${escapeAttr(r.avatar)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${AVATAR_FALLBACK}';">
+      <span class="name-text">${escapeHtml(r.name||"")}</span>
+    </span>`;
+  tds[3].innerHTML=r.level!==""?`Lv ${escapeHtml(r.level)}`:"";
   tds[4].innerHTML=`<span class="badge rounded-pill ${r.st.badge} border">${escapeHtml(r.st.label)}</span>`;
   tds[5].innerHTML=`<i class="bi bi-clock-history"></i><span>${escapeHtml(r.last)}</span>`;
   updateChipCounts(); persist();
@@ -561,13 +599,11 @@ throttleEl?.addEventListener("change",()=>{
 });
 useProxyEl?.addEventListener("change",()=>{ state.settings.useProxy=useProxyEl.checked; persist(); });
 proxyUrlEl?.addEventListener("change",()=>{ state.settings.proxyUrl=proxyUrlEl.value.trim(); persist(); });
-
-/* Persist API key */
-apiKeyEl?.addEventListener("input", persistKeyToStorage);
-apiKeyEl?.addEventListener("change", persistKeyToStorage);
-rememberKeyEl?.addEventListener("change", persistKeyToStorage);
+apiKeyEl?.addEventListener("change",saveKeyMaybe);
+rememberKeyEl?.addEventListener("change",saveKeyMaybe);
 
 /* Offcanvas clone (mobile) */
+const offcanvasEl = document.getElementById("sidebarOffcanvas");
 offcanvasEl?.addEventListener("show.bs.offcanvas", ()=>{
   const src = document.getElementById("sidebar");
   const dest = document.getElementById("sidebarClone");
@@ -576,48 +612,63 @@ offcanvasEl?.addEventListener("show.bs.offcanvas", ()=>{
   const frag = document.createDocumentFragment();
   src.querySelectorAll(".card.glass").forEach(card=>{
     const clone = card.cloneNode(true);
-    clone.querySelectorAll("[id]").forEach(n=>n.removeAttribute("id"));
+    // keep data-action buttons, but drop ids to avoid duplicates
+    clone.querySelectorAll("[id]").forEach(n=>{
+      // keep specific ids for inputs we read directly
+      if(n.id==="addDlg" || n.id==="bulkDlg" ) return;
+      n.removeAttribute("id");
+    });
+    // annotate binds for api key & remember
+    clone.querySelector('input[type="password"]')?.setAttribute("data-bind","apiKey");
+    clone.querySelector('input[type="checkbox"]')?.setAttribute("data-bind","rememberKey");
     frag.appendChild(clone);
   });
   dest.appendChild(frag);
-
-  // Bind values into clone
-  const cloneApi = dest.querySelector('[data-bind="apiKey"]');
-  const cloneRemember = dest.querySelector('[data-bind="rememberKey"]');
-  if(cloneApi && apiKeyEl) cloneApi.value = apiKeyEl.value;
-  if(cloneRemember && rememberKeyEl) cloneRemember.checked = rememberKeyEl.checked;
-
-  dest.addEventListener("input",(ev)=>{
-    if(ev.target.matches('[data-bind="apiKey"]') && apiKeyEl){
-      apiKeyEl.value = ev.target.value;
-      persistKeyToStorage();
-    }
-  });
-  dest.addEventListener("change",(ev)=>{
-    if(ev.target.matches('[data-bind="rememberKey"]') && rememberKeyEl){
-      rememberKeyEl.checked = ev.target.checked;
-      persistKeyToStorage();
-    }
-  }, { once:false });
 });
 
-/* About modal */
+/* ---------------- About modal (updated) ---------------- */
 btnAbout?.addEventListener("click", async ()=>{
-  $("#aboutVersion").textContent = APP_VERSION;
-  $("#aboutThemeLabel").textContent = `Theme: ${localStorage.getItem("theme") || "dark"}`;
+  // version + theme
+  const ver = $("#aboutVersion");
+  const verF = $("#aboutVersionFooter");
+  const themeLbl = $("#aboutThemeLabel");
+  const themeLblF = $("#aboutThemeLabelFooter");
+
+  if (ver)  ver.textContent  = APP_VERSION;
+  if (verF) verF.textContent = APP_VERSION;
+
+  const theme = localStorage.getItem("theme") || "dark";
+  const themeText = `Theme: ${theme}`;
+  if (themeLbl)  themeLbl.textContent  = themeText.replace("Theme: ", "");
+  if (themeLblF) themeLblF.textContent = themeText;
+
+  // quick stats
+  const tCount = state.targets.length;
+  const aboutTargets = $("#aboutTargets");
+  const aboutSavedMeta = $("#aboutSavedMeta");
+  if (aboutTargets)   aboutTargets.textContent = String(tCount);
+  if (aboutSavedMeta) aboutSavedMeta.textContent = ($("#savedMeta")?.textContent || "—");
+
+  // avatar
   await ensureAboutAvatar();
-  modalShow("#aboutDlg");
+
+  new bootstrap.Modal($("#aboutDlg")).show();
 });
+
 $("#copyIdBtn")?.addEventListener("click", async ()=>{
   try{
     await navigator.clipboard.writeText(ABOUT_TORN_ID);
-    $("#copyIdBtn").innerHTML = '<i class="bi bi-clipboard-check me-1"></i> Copied!';
-    setTimeout(()=>$("#copyIdBtn").innerHTML='<i class="bi bi-clipboard me-1"></i> Copy profile ID',1200);
+    const btn = $("#copyIdBtn");
+    if (btn) {
+      btn.innerHTML = '<i class="bi bi-clipboard-check me-1"></i> Copied!';
+      setTimeout(()=>{ const b=$("#copyIdBtn"); if(b) b.innerHTML='<i class="bi bi-clipboard me-1"></i> Copy profile ID'; },1200);
+    }
   }catch{}
 });
+
 async function ensureAboutAvatar(){
-  const aboutAvatar = $("#aboutAvatar");
-  if(!aboutAvatar || aboutAvatar.dataset.loaded === "1") return;
+  const avatar = $("#aboutAvatar");
+  if(!avatar || avatar.dataset.loaded === "1") return;
   let url = "";
   const key = state.apiKey || localStorage.getItem(KEY_KEY) || "";
   if(key){
@@ -630,159 +681,42 @@ async function ensureAboutAvatar(){
     }catch{}
   }
   if(!url) url = `https://www.torn.com/signature.php?user=${ABOUT_TORN_ID}`;
-  aboutAvatar.src = url;
-  aboutAvatar.dataset.loaded = "1";
+  avatar.src = url;
+  avatar.dataset.loaded = "1";
 }
 
-/* API key info dialog */
-function showApiKeyInfo(){ modalShow("#apiKeyInfoDlg"); }
-$("#keyFocusBtn")?.addEventListener("click", ()=>{
-  modalHide("#apiKeyInfoDlg");
-  if(window.innerWidth < 992 && offcanvasEl){
-    bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl).show();
+/* Global [data-action] handler for mobile sidebar actions */
+document.addEventListener("click",(e)=>{
+  const target = e.target.closest("[data-action]");
+  if(!target) return;
+  const act = target.dataset.action;
+
+  if(act==="save-api"){ e.preventDefault(); saveApiAndCloseSidebar(); return; }
+  if(act==="open-add"){ e.preventDefault(); openAddDialog("single", true); return; }
+  if(act==="open-bulk"){ e.preventDefault(); openAddDialog("bulk", true); return; }
+
+  if(act==="open-file"){ e.preventDefault(); $("#file")?.click(); return; }
+  if(act==="export-json"){ e.preventDefault(); btnSave?.click(); return; }
+  if(act==="fetch-start"){
+    e.preventDefault();
+    readFromOffcanvasIfPresent();
+    if(!apiKeyPresent()){ showApiKeyInfo(); return; }
+    closeOffcanvasIfOpen();
+    startFetchAll();
+    return;
   }
-  setTimeout(()=>{
-    document.querySelector('[data-bind="apiKey"]')?.focus();
-  }, 300);
+  if(act==="fetch-stop"){ e.preventDefault(); state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); return; }
+  if(act==="about"){ e.preventDefault(); btnAbout?.click(); return; }
+  if(act==="theme-auto"){ setTheme("auto", true); return; }
+  if(act==="theme-light"){ setTheme("light", true); return; }
+  if(act==="theme-dark"){ setTheme("dark", true); return; }
+
+  if(act==="toggle-sort-dir"){ state.sort.dir *= -1; render(); updateSortBar(); return; }
+  if(act==="sort-key"){ state.sort.key = target.dataset.key; render(); updateSortBar(); return; }
 });
-function saveApiAndCloseSidebar(){
-  readFromOffcanvasIfPresent();
-  persistKeyToStorage();
-  setStatus(state.apiKey ? "API key saved." : "API key cleared.", false);
-  if(offcanvasEl){
-    const inst = bootstrap.Offcanvas.getInstance(offcanvasEl) || bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
-    if(offcanvasEl.classList.contains("show")) inst.hide();
-  }
-}
 
-/* ---------- Mobile polish: global + card CSS + sort bar ---------- */
-function injectMobileStyles(){
-  if(document.getElementById("mobile-card-styles")) return;
-  const s = document.createElement("style");
-  s.id = "mobile-card-styles";
-  s.textContent = `
-/* Global fixes */
-.table-wrap{ border-radius: var(--radius); overflow: clip; clip-path: inset(0 round var(--radius)); }
-@supports not (overflow: clip){ .table-wrap{ overflow: hidden; } }
-
-/* Always constrain avatars */
-#grid .avatar{ width:26px; height:26px; border-radius:8px; object-fit:cover; border:1px solid var(--border); background:rgba(0,0,0,.15); }
-
-/* Mobile cards & interactions */
-@media (max-width: 768px){
-  .table-modern thead{ display:none !important; }
-
-  /* Sort bar lives OUTSIDE the scroll area now; spacing only */
-  #mobileSortBar{ margin: 6px 0 10px; }
-  #mobileSortBar .btn{ border-radius:12px; }
-
-  /* Kill row hover highlight on mobile completely */
-  .table-modern tbody tr:hover,
-  .table-modern tbody tr:hover td{ background: inherit !important; }
-  .table-modern tbody tr{ cursor: default; }
-
-  .table-responsive{ overflow: visible; }
-  #grid{ border-collapse: separate; border-spacing: 0 14px; }
-  #grid tbody td{ border-bottom:0 !important; padding:.35rem .4rem; }
-
-  #grid tbody tr{
-    display:grid;
-    grid-template-columns: 36px 1fr auto;
-    grid-template-areas:
-      "chk title status"
-      "chk meta1 status"
-      "chk meta2 status"
-      "chk foot  foot";
-    gap: 6px 12px;
-    background:
-      radial-gradient(450px 110px at 10% -60%, rgba(125,211,252,.10), transparent 70%),
-      var(--tbl-bg);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 12px 12px 10px 8px;
-    box-shadow: 0 10px 24px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.05);
-  }
-
-  #grid tbody td:first-child{ grid-area: chk; align-self:start; padding-top:.35rem; }
-  #grid input[type="checkbox"]{ width:22px; height:22px; }
-
-  #grid .avatar{ width:42px; height:42px; border-radius:12px; }
-  .cell-name{ grid-area: title; font-size:1.05rem; font-weight:800; letter-spacing:.2px; }
-  .cell-name .name-wrap{ display:flex; align-items:center; gap:.6rem; }
-
-  .cell-status{ grid-area: status; justify-self:end; align-self:start; }
-  .cell-status .badge{ padding:.35rem .6rem; font-weight:800; letter-spacing:.15px; box-shadow: 0 4px 18px rgba(0,0,0,.25); }
-
-  .cell-id{ grid-area: meta1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--bs-secondary-color); }
-  .cell-level{ grid-area: meta2; }
-  .lvl-pill{ display:inline-block; padding:.18rem .5rem; border-radius:999px; border:1px solid var(--border); background: rgba(125,211,252,.06); font-weight:800; letter-spacing:.2px; }
-
-  .cell-last{ grid-area: foot; display:flex; align-items:center; gap:.45rem; color: var(--bs-secondary-color); margin-top:.2rem; }
-  .cell-last .bi{ opacity:.8; }
-}
-  `;
-  document.head.appendChild(s);
-}
-
-function insertMobileSortBar(){
-  if(document.getElementById("mobileSortBar")) return;
-
-  // Place BEFORE the scroll container so it never overlays cards
-  const gridScroll = document.getElementById("gridScroll");
-  if(!gridScroll || !gridScroll.parentElement) return;
-
-  const wrap = document.createElement("div");
-  wrap.id = "mobileSortBar";
-  wrap.className = "d-md-none";
-  wrap.innerHTML = `
-    <div class="d-flex gap-2">
-      <div class="dropdown flex-grow-1">
-        <button class="btn btn-ghost btn-sm w-100 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-          <i class="bi bi-arrow-down-up me-1"></i><span id="sortLabel">Sort: ID ↑</span>
-        </button>
-        <ul class="dropdown-menu w-100">
-          <li><button class="dropdown-item" data-sort="id">ID</button></li>
-          <li><button class="dropdown-item" data-sort="name">Name</button></li>
-          <li><button class="dropdown-item" data-sort="level">Level</button></li>
-          <li><button class="dropdown-item" data-sort="status">Status</button></li>
-          <li><button class="dropdown-item" data-sort="last">Last action</button></li>
-        </ul>
-      </div>
-      <button class="btn btn-ghost btn-sm" id="toggleSortDir" aria-label="Toggle sort direction">
-        <i id="sortDirIcon" class="bi bi-sort-down"></i>
-      </button>
-    </div>
-  `;
-  gridScroll.parentElement.insertBefore(wrap, gridScroll);
-
-  wrap.querySelectorAll(".dropdown-item").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const key = btn.dataset.sort;
-      state.sort = { key, dir: 1 };
-      updateMobileSortLabel();
-      render();
-    });
-  });
-  $("#toggleSortDir").addEventListener("click", ()=>{
-    state.sort.dir *= -1;
-    updateMobileSortLabel();
-    render();
-  });
-  updateMobileSortLabel();
-}
-function updateMobileSortLabel(){
-  const label = document.getElementById("sortLabel");
-  const icon  = document.getElementById("sortDirIcon");
-  if(!label || !icon) return;
-  const dirArrow = state.sort.dir>0 ? "↑" : "↓";
-  label.textContent = `Sort: ${titleCase(state.sort.key)} ${dirArrow}`;
-  icon.className = state.sort.dir>0 ? "bi bi-sort-down" : "bi bi-sort-up";
-}
-function titleCase(s){ return String(s||"").replace(/\b\w/g, c=>c.toUpperCase()); }
-
-/* ---------- Init ---------- */
+/* Init */
 initTheme();
 setHeights();
-injectMobileStyles();
-insertMobileSortBar();
+ensureSortBar();
 restore();

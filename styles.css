@@ -264,7 +264,13 @@ body { background: var(--bg-grad); overflow: hidden; }
   background: transparent !important; /* no gray bars in card mode */
 }
 :root[data-bs-theme="dark"] .table-modern tbody td{ border-bottom-color: rgba(255,255,255,.06) !important; }
+
+/* Row hover tint (desktop) */
 .table-modern tbody tr:hover{ background: rgba(125,211,252,.08) !important; cursor: pointer; }
+
+/* Prevent text selection when interacting with rows */
+#grid tbody tr, #grid tbody tr *{ -webkit-user-select: none; user-select: none; }
+
 /* remove last row bottom border to prevent “pointy” artifact */
 .table-modern tbody tr:last-child td{ border-bottom: 0 !important; }
 
@@ -321,7 +327,7 @@ th.sortable.sort-desc::after{ border-top-color: rgba(0,0,0,.75); }
 }
 .status-dot{ width:10px; height:10px; border-radius:999px; background:#36d39f; box-shadow:0 0 0 3px rgba(54,211,159,.18); }
 
-/* About */
+/* ---------------- About (updated) ---------------- */
 .about-modal .modal-header{ border-bottom: 1px solid var(--border); }
 .about-hero{
   background:
@@ -337,8 +343,42 @@ th.sortable.sort-desc::after{ border-top-color: rgba(0,0,0,.75); }
   border:2px solid rgba(125,211,252,.35);
   background: radial-gradient(60% 60% at 40% 35%, rgba(255,255,255,.25), transparent);
 }
+/* Decorative ring behind avatar */
+.about-ring{
+  position: relative;
+  width: 110px; height: 110px; border-radius: 999px;
+  display: grid; place-items: center;
+  background:
+    radial-gradient(80px 80px at 50% 50%, rgba(125,211,252,.12), transparent 70%),
+    conic-gradient(from 210deg, rgba(56,189,248,.25), rgba(125,211,252,.05), rgba(56,189,248,.25));
+  box-shadow: 0 6px 26px rgba(14,165,233,.18);
+  border: 1px solid var(--border);
+}
+.about-avatar{ background-clip: padding-box; }
+/* Stats grid */
+.about-stats{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.about-stats .stat{
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.about-stats .label{
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .2px;
+  opacity: .85;
+  margin-bottom: 2px;
+}
+.about-stats .value{
+  font-weight: 700;
+  line-height: 1.2;
+}
 
-/* Fetch modal — filter glow (no square box) */
+/* Fetch modal — clean glow (no square) */
 .ring-wrap{ position:relative; width:160px; height:160px; }
 .ring-svg{ width:160px; height:160px; display:block; margin:auto; }
 .ring-bg{ fill:none; stroke: var(--ring-track); stroke-width: 12; }
@@ -347,6 +387,7 @@ th.sortable.sort-desc::after{ border-top-color: rgba(0,0,0,.75); }
   transform: rotate(-90deg); transform-origin: 60px 60px;
   stroke-dasharray:100; stroke-dashoffset:100;
   transition: stroke-dashoffset .28s ease;
+  filter: drop-shadow(0 12px 36px var(--ring-glow));
 }
 .ring-label{
   position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -382,49 +423,78 @@ body::-webkit-scrollbar-thumb{
 body::-webkit-scrollbar-thumb:hover{ background:#273246; }
 :root[data-bs-theme="light"] .table-responsive::-webkit-scrollbar-thumb:hover,
 :root[data-bs-theme="light"] .grid-scroll-body::-webkit-scrollbar-thumb:hover,
-:root[data-bs-theme="light"] body::-webkit-scrollbar-thumb:hover{ background:#b6c6d9; }
+:root[data-bs-theme="light"] body::-webkit-scrollbar-thumb:hover{ background:#b6c9d9; }
 
 /* Entrances */
 .card.glass{ animation: fadeInUp .22s ease-out both; }
 .table-modern tbody tr{ animation: fadeIn .2s ease-out both; }
 
-/* ---------- Mobile “card” layout (beautiful & readable) ---------- */
+/* ---------- Mobile “card” layout (beautiful, spaced, no hover highlight) ---------- */
 @media (max-width: 768px){
   /* Hide footer status bar & header card on mobile */
   .statusbar-fixed{ display:none; }
   :root{ --statusbar-h: 0px; }
   #boardHeader{ display:none; }
 
+  /* Optional sort bar at top (if rendered) */
+  #sortBar{ display:block; position: sticky; top: 0; z-index: 3; margin: 0 12px 10px; }
+
   .table-modern thead{ display:none; }
 
-  .table-responsive{ overflow: visible; }
-  #grid{ border-collapse: separate; border-spacing: 0 14px; }
+  /* Side gutters so cards don't touch the edges */
+  .grid-scroll-body{ padding-left: 12px !important; padding-right: 12px !important; }
 
+  .table-responsive{ overflow: visible; }
+  #grid{ border-collapse: separate; border-spacing: 0 0; } /* spacing via margins below */
+
+  /* Card block */
   #grid tbody tr{
     display:grid;
+    margin: 14px 0;                 /* ← real spacing between cards */
     grid-template-columns: 36px 1fr auto;
     grid-template-areas:
       "chk title status"
       "chk meta1 status"
       "chk meta2 status"
       "chk foot  foot";
-    gap: 4px 12px;
+    gap: 6px 12px;
 
     background:
       radial-gradient(500px 120px at 10% -40%, rgba(125,211,252,.10), transparent 70%),
       var(--tbl-bg);
     border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 12px 12px 10px 8px;
+    padding: 14px 12px 12px 8px;
     box-shadow:
       0 10px 28px rgba(0,0,0,.35),
       inset 0 0 0 1px rgba(255,255,255,.04);
+    background-clip: padding-box;
   }
-  #grid tbody tr:hover{ background:
-      radial-gradient(500px 140px at 10% -40%, rgba(125,211,252,.14), transparent 72%),
-      var(--tbl-bg) !important; }
 
-  #grid tbody td{ border-bottom:0 !important; padding:.35rem .4rem; }
+  /* 1) Kill Bootstrap's cell hover tint */
+  .table-hover > tbody > tr:hover > *{ background-color: transparent !important; }
+
+  /* 2) Kill any descendant background/outline that appears only on row hover */
+  #grid tbody tr:hover,
+  #grid tbody tr:hover *,
+  #grid tbody tr:hover *::before,
+  #grid tbody tr:hover *::after{
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+  /* Keep status pill colors intact even on hover */
+  #grid tbody tr .badge{ background: var(--bs-badge-bg) !important; }
+
+  /* Also disable row hover tint entirely */
+  .table-modern tbody tr:hover{
+    background:
+      radial-gradient(500px 120px at 10% -40%, rgba(125,211,252,.10), transparent 70%),
+      var(--tbl-bg) !important;
+    cursor: default;
+  }
+
+  #grid tbody td{ border-bottom:0 !important; padding:.4rem .45rem; }
 
   /* Areas */
   #grid tbody td:first-child{ grid-area: chk; align-self:start; padding-top:.35rem; }
@@ -444,9 +514,7 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
     box-shadow: 0 4px 18px rgba(0,0,0,.35);
   }
 
-  .cell-status{
-    grid-area: status; justify-self:end; align-self:start;
-  }
+  .cell-status{ grid-area: status; justify-self:end; align-self:start; }
   .cell-status .badge{
     padding:.35rem .6rem; font-weight:800; letter-spacing:.15px;
     box-shadow: 0 4px 18px rgba(0,0,0,.25);
@@ -459,10 +527,7 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
     opacity:.95;
   }
 
-  .cell-level{
-    grid-area: meta2;
-    align-self:center;
-  }
+  .cell-level{ grid-area: meta2; align-self:center; }
   .lvl-pill{
     display:inline-block;
     padding:.18rem .5rem;
@@ -475,31 +540,47 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
 
   .cell-last{
     grid-area: foot;
-    display:flex; align-items:center; gap:.45rem;
+    display:flex; align-items:center; gap:.5rem;   /* ← space between clock and text */
     color: var(--bs-secondary-color);
     margin-top:.2rem;
   }
   .cell-last .bi{ opacity:.8; }
 }
+
+/* Hide header toolbar on mobile; use Actions card in sidebar instead */
+@media (max-width: 768px){
+  .topbar .toolbar{ display:none !important; }
+  .main-shell{ height: calc(100vh - var(--topbar-h) - var(--safe-bottom)); }
+  .grid-scroll-body{ padding-bottom: calc(12px + var(--safe-bottom)) !important; }
+}
+
 /* --- Desktop-only spacing (alignment-safe) --- */
 @media (min-width: 769px) {
-  /* Keep table rows aligned vertically without changing layout model */
   .table-modern tbody td{ vertical-align: middle; }
 
-  /* Subtle gap between avatar and username without flex */
+  /* avatar → username gentle space + small avatar on desktop */
   #grid .cell-name .avatar{
-    margin-right: 0.5rem;   /* ~8px space */
-    vertical-align: middle; /* keeps baseline tidy with the text */
-  }
-  #grid .cell-name .name-text{
+    margin-right: .5rem;
     vertical-align: middle;
+    width: 24px; height: 24px; border-radius: 8px; object-fit: cover;
+    border:1px solid var(--border);
   }
+  #grid .cell-name .name-text{ vertical-align: middle; }
 
-  /* Subtle gap between clock icon and last-action text (no flex) */
+  /* clock → last-action text gap */
   #grid .cell-last .bi{
-    margin-right: 0.45rem;  /* ~7px space */
-    position: relative;
-    top: 1px;               /* tiny optical alignment */
+    margin-right: .45rem;
+    position: relative; top: 1px;
     opacity: .9;
   }
+}
+
+/* Pointer cursor on whole card rows */
+#grid tbody tr { cursor: pointer; }
+.table-modern tbody tr:hover { cursor: pointer; }
+
+/* Mobile card layout keeps pointer too */
+@media (max-width: 768px){
+  #grid tbody tr { cursor: pointer; }
+  .table-modern tbody tr:hover { cursor: pointer; }
 }
