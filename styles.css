@@ -264,13 +264,7 @@ body { background: var(--bg-grad); overflow: hidden; }
   background: transparent !important; /* no gray bars in card mode */
 }
 :root[data-bs-theme="dark"] .table-modern tbody td{ border-bottom-color: rgba(255,255,255,.06) !important; }
-
-/* Row hover tint (desktop) */
 .table-modern tbody tr:hover{ background: rgba(125,211,252,.08) !important; cursor: pointer; }
-
-/* Prevent text selection when interacting with rows */
-#grid tbody tr, #grid tbody tr *{ -webkit-user-select: none; user-select: none; }
-
 /* remove last row bottom border to prevent “pointy” artifact */
 .table-modern tbody tr:last-child td{ border-bottom: 0 !important; }
 
@@ -327,7 +321,7 @@ th.sortable.sort-desc::after{ border-top-color: rgba(0,0,0,.75); }
 }
 .status-dot{ width:10px; height:10px; border-radius:999px; background:#36d39f; box-shadow:0 0 0 3px rgba(54,211,159,.18); }
 
-/* ---------------- About (updated) ---------------- */
+/* About */
 .about-modal .modal-header{ border-bottom: 1px solid var(--border); }
 .about-hero{
   background:
@@ -343,65 +337,25 @@ th.sortable.sort-desc::after{ border-top-color: rgba(0,0,0,.75); }
   border:2px solid rgba(125,211,252,.35);
   background: radial-gradient(60% 60% at 40% 35%, rgba(255,255,255,.25), transparent);
 }
-/* Decorative ring behind avatar */
-.about-ring{
-  position: relative;
-  width: 110px; height: 110px; border-radius: 999px;
-  display: grid; place-items: center;
-  background:
-    radial-gradient(80px 80px at 50% 50%, rgba(125,211,252,.12), transparent 70%),
-    conic-gradient(from 210deg, rgba(56,189,248,.25), rgba(125,211,252,.05), rgba(56,189,248,.25));
-  box-shadow: 0 6px 26px rgba(14,165,233,.18);
-  border: 1px solid var(--border);
-}
-.about-avatar{ background-clip: padding-box; }
-/* Stats grid */
-.about-stats{
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.about-stats .stat{
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-}
-.about-stats .label{
-  font-size: .75rem;
-  font-weight: 800;
-  letter-spacing: .2px;
-  opacity: .85;
-  margin-bottom: 2px;
-}
-.about-stats .value{
-  font-weight: 700;
-  line-height: 1.2;
-}
 
-/* ===== Fetch modal — Brilliant look ===== */
-.fetch-modal .modal-body{ position: relative; }
+/* --- Fetch modal styles (inner-only glow ring) --- */
+.fetch-modal .modal-body{ padding-top: 26px; }
 .fetch-hero{
   display:inline-block;
-  padding:.25rem .65rem;
+  padding:.25rem .6rem;
   border-radius:999px;
   border:1px solid var(--border);
-  background: linear-gradient(180deg, rgba(125,211,252,.10), rgba(125,211,252,.04));
+  background: rgba(125,211,252,.08);
+  font-weight:700;
+  font-size:.8rem;
 }
-
-/* Ring */
 .ring-wrap{
   --ring-size: 180px;
   width: var(--ring-size);
   height: var(--ring-size);
-  position: relative;
-  /* removed outer drop-shadow to prevent boxy glow */
-  /* filter: drop-shadow(0 10px 30px rgba(14,165,233,.22)); */
+  position: relative; /* no outer drop-shadow to avoid box glow */
 }
-.ring-svg{
-  width: 100%;
-  height: 100%;
-  display:block;
-}
+.ring-svg{ width: 100%; height: 100%; display:block; }
 .ring-bg{
   fill:none;
   stroke: var(--ring-track);
@@ -411,7 +365,7 @@ th.sortable.sort-desc::after{ border-top-color: rgba(0,0,0,.75); }
   fill:none;
   stroke: rgba(125,211,252,.16);
   stroke-width: 1.5;
-  stroke-dasharray: 1 11.5; /* dotted dial */
+  stroke-dasharray: 1 11.5;
   transform: rotate(-90deg);
   transform-origin: 60px 60px;
 }
@@ -421,84 +375,48 @@ th.sortable.sort-desc::after{ border-top-color: rgba(0,0,0,.75); }
   stroke-linecap:round;
   transform: rotate(-90deg);
   transform-origin: 60px 60px;
-  stroke-dasharray:100;
-  stroke-dashoffset:100;
+  stroke-dasharray:100;         /* progress length scale (0..100) */
+  stroke-dashoffset:100;        /* 100 -> empty, 0 -> full */
   transition: stroke-dashoffset .28s ease, stroke .3s ease;
-  /* removed drop-shadow that caused outer glow box */
-  /* filter: drop-shadow(0 14px 40px var(--ring-glow)); */
 }
 
-/* Center label + success icon */
 .ring-label{
   position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
   text-align:center; pointer-events:none;
 }
-.ring-icon{
-  font-size: 1.6rem;
-  color: #34d399;
-  margin-top:.15rem;
-}
+.ring-icon{ font-size: 1.6rem; color: #34d399; margin-top:.15rem; }
 
-/* Inner glow overlay (masked to the donut) */
+/* The glow follows the same arc as ring-fg (no stray 4 o'clock dot) */
 .ring-glow{
   fill:none;
-  stroke-width:14;            /* slightly thicker for a soft inner glow */
+  stroke-width:14;           /* slightly thicker for soft edge */
   stroke-linecap:round;
-  opacity:.55;
-  stroke-dasharray:0 100;     /* JS updates this to match progress */
+  transform: rotate(-90deg);
+  transform-origin: 60px 60px;
+  stroke-dasharray:100;
   stroke-dashoffset:100;
-  animation: glowPulse 1.8s ease-in-out infinite; /* animated glow */
+  opacity:.55;
+  animation: glowPulse 1.8s ease-in-out infinite;
+  filter: url(#softGlow);    /* inner blur only; masked via donut in HTML */
 }
-
-/* Gentle breathing of the inner glow */
 @keyframes glowPulse {
   0%,100% { opacity:.35 }
   50%     { opacity:.85 }
 }
 
-
-/* Stats grid */
+/* Stats row pills */
 .fetch-stats{
-  width: min(420px, 90%);
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px; max-width: 560px;
 }
 .fetch-stats .stat{
-  padding: 10px;
+  padding:10px 14px;
   border-radius: 12px;
+  background: linear-gradient(180deg, var(--glass-1), var(--glass-2));
   border: 1px solid var(--border);
-  backdrop-filter: saturate(115%) blur(6px);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.02);
 }
-.fetch-stats .label{
-  font-size: .7rem;
-  font-weight: 800; letter-spacing:.2px; opacity:.85; margin-bottom:2px;
-}
-.fetch-stats .value{
-  font-weight: 700; line-height: 1.2;
-}
-
-/* States (completed / stopped) */
-.fetch-modal.is-complete .ring-fg{ stroke:#34d399 !important; filter: drop-shadow(0 16px 44px rgba(52,211,153,.35)); }
-.fetch-modal.is-stopped  .ring-fg{ stroke:#f59e0b !important; filter: drop-shadow(0 16px 44px rgba(245,158,11,.35)); }
-.fetch-modal.is-stopped  #ringIcon{ color:#f59e0b; }
-
-/* Small screens: make stats 2x2 */
-@media (max-width: 420px){
-  .fetch-stats{ grid-template-columns: repeat(2,1fr); }
-}
-
-/* API key modal styling */
-.keymodal .modal-header{ border-bottom: none; }
-.keymodal-hero{ display:flex; align-items:center; gap:.9rem; padding:16px var(--pad-card) 10px; }
-.keymodal-icon{
-  width:46px;height:46px;border-radius:12px;display:grid;place-items:center;
-  background: linear-gradient(180deg, rgba(125,211,252,.18), rgba(125,211,252,.06));
-  border:1px solid rgba(125,211,252,.32);
-  box-shadow: inset 0 0 28px rgba(125,211,252,.16);
-}
-.keymodal-icon i{ font-size:1.2rem; color: var(--brand); }
-.keymodal-note{ border:1px dashed var(--border); border-radius:12px; }
+.fetch-stats .label{ font-size:.8rem; color: var(--bs-secondary-color); font-weight:700; }
+.fetch-stats .value{ font-weight:800; }
 
 /* Scrollbars */
 .table-responsive::-webkit-scrollbar,
@@ -523,7 +441,7 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
 .card.glass{ animation: fadeInUp .22s ease-out both; }
 .table-modern tbody tr{ animation: fadeIn .2s ease-out both; }
 
-/* ---------- Mobile “card” layout (beautiful, spaced, no hover highlight) ---------- */
+/* ---------- Mobile “card” layout ---------- */
 @media (max-width: 768px){
   /* Hide footer status bar & header card on mobile */
   .statusbar-fixed{ display:none; }
@@ -539,12 +457,12 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
   .grid-scroll-body{ padding-left: 12px !important; padding-right: 12px !important; }
 
   .table-responsive{ overflow: visible; }
-  #grid{ border-collapse: separate; border-spacing: 0 0; } /* spacing via margins below */
+  #grid{ border-collapse: separate; border-spacing: 0 0; }
 
   /* Card block */
   #grid tbody tr{
     display:grid;
-    margin: 14px 0;                 /* ← real spacing between cards */
+    margin: 14px 0;
     grid-template-columns: 36px 1fr auto;
     grid-template-areas:
       "chk title status"
@@ -565,22 +483,10 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
     background-clip: padding-box;
   }
 
-  /* 1) Kill Bootstrap's cell hover tint */
+  /* Kill Bootstrap's cell hover tint */
   .table-hover > tbody > tr:hover > *{ background-color: transparent !important; }
 
-  /* 2) Kill any descendant background/outline that appears only on row hover */
-  #grid tbody tr:hover,
-  #grid tbody tr:hover *,
-  #grid tbody tr:hover *::before,
-  #grid tbody tr:hover *::after{
-    background: transparent !important;
-    box-shadow: none !important;
-    outline: none !important;
-  }
-  /* Keep status pill colors intact even on hover */
-  #grid tbody tr .badge{ background: var(--bs-badge-bg) !important; }
-
-  /* Also disable row hover tint entirely */
+  /* Disable row hover tint entirely */
   .table-modern tbody tr:hover{
     background:
       radial-gradient(500px 120px at 10% -40%, rgba(125,211,252,.10), transparent 70%),
@@ -634,11 +540,14 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
 
   .cell-last{
     grid-area: foot;
-    display:flex; align-items:center; gap:.5rem;   /* ← space between clock and text */
+    display:flex; align-items:center; gap:.5rem;
     color: var(--bs-secondary-color);
     margin-top:.2rem;
   }
   .cell-last .bi{ opacity:.8; }
+
+  /* Fetch stats grid on small screens */
+  .fetch-stats{ grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
 
 /* Hide header toolbar on mobile; use Actions card in sidebar instead */
@@ -652,7 +561,6 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
 @media (min-width: 769px) {
   .table-modern tbody td{ vertical-align: middle; }
 
-  /* avatar → username gentle space + small avatar on desktop */
   #grid .cell-name .avatar{
     margin-right: .5rem;
     vertical-align: middle;
@@ -661,13 +569,13 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
   }
   #grid .cell-name .name-text{ vertical-align: middle; }
 
-  /* clock → last-action text gap */
   #grid .cell-last .bi{
     margin-right: .45rem;
     position: relative; top: 1px;
     opacity: .9;
   }
 }
+
 /* Pointer cursor on whole card rows */
 #grid tbody tr { cursor: pointer; }
 .table-modern tbody tr:hover { cursor: pointer; }
@@ -676,4 +584,14 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
 @media (max-width: 768px){
   #grid tbody tr { cursor: pointer; }
   .table-modern tbody tr:hover { cursor: pointer; }
+}
+
+/* FIX: prevent mobile cards being clipped by the table wrapper mask */
+@media (max-width: 768px){
+  .table-wrap{
+    overflow: visible !important;
+    -webkit-mask: none !important;
+    mask: none !important;
+    border-radius: 0;
+  }
 }

@@ -1,5 +1,5 @@
-/* Torn Targets UI — table + mobile cards + brilliant fetch dialog + mobile actions */
-const APP_VERSION = "2.5.0";
+/* Target Tracker UI — table + mobile cards + brilliant fetch dialog + mobile actions */
+const APP_VERSION = "2.5.1";
 const STORE_KEY = "tornTargets.data.v2";
 const KEY_KEY   = "tornTargets.apiKey.v1";
 const ABOUT_TORN_ID = "3212954";
@@ -56,7 +56,6 @@ const bulkConfirmLegacy=$("#bulkConfirmLegacy");
 const apiKeyInfoDlg = new bootstrap.Modal($("#apiKeyInfoDlg"));
 $("#keyFocusBtn")?.addEventListener("click", ()=>{
   apiKeyInfoDlg.hide();
-  // focus the API key field (desktop or offcanvas clone)
   const off = document.querySelector('#sidebarOffcanvas [data-bind="apiKey"]');
   const el = apiKeyEl || off;
   el?.focus();
@@ -175,7 +174,6 @@ function applySettingsToUI(){
   if(proxyUrlEl)    proxyUrlEl.value=state.settings.proxyUrl||"";
 }
 function saveKeyMaybe(){
-  // pull value from desktop field if present, else from offcanvas clone
   let key = apiKeyEl?.value?.trim();
   if(!key){
     const off = document.querySelector('#sidebarOffcanvas [data-bind="apiKey"]');
@@ -201,15 +199,10 @@ function closeOffcanvasIfOpen(){
   if(inst) inst.hide();
 }
 function readFromOffcanvasIfPresent(){
-  // copy values from offcanvas into state/UI before actions
   const offApi = document.querySelector('#sidebarOffcanvas [data-bind="apiKey"]');
   const offRmb = document.querySelector('#sidebarOffcanvas [data-bind="rememberKey"]');
-  if(offApi){
-    if(apiKeyEl) apiKeyEl.value = offApi.value;
-  }
-  if(offRmb){
-    if(rememberKeyEl) rememberKeyEl.checked = offRmb.checked;
-  }
+  if(offApi){ if(apiKeyEl) apiKeyEl.value = offApi.value; }
+  if(offRmb){ if(rememberKeyEl) rememberKeyEl.checked = offRmb.checked; }
   saveKeyMaybe();
 }
 function apiKeyPresent(){ return !!(state.apiKey && state.apiKey.trim()); }
@@ -254,6 +247,7 @@ function ensureVisibleState(){
     ? `${state.targets.length} target${state.targets.length!==1?'s':''} • last saved ${new Date().toLocaleTimeString()}`
     : `No data yet`;
   boardMeta.textContent = metaText;
+  const statusBarSaved = $("#savedMeta");
   if (statusBarSaved) statusBarSaved.textContent = metaText;
 }
 function sortedTargets(){
@@ -314,7 +308,6 @@ function render(){
 /* chip counts for sidebar filter */
 function updateChipCounts(){
   const c = { all: state.targets.length, ok: 0, hosp: 0, jail: 0, travel: 0, off: 0 };
-
   for (const id of state.targets){
     const cls = rowData(id).st.label.toLowerCase();
     if (cls.includes("okay")) c.ok++;
@@ -323,15 +316,13 @@ function updateChipCounts(){
     else if (cls.includes("abroad")) c.travel++;
     else c.off++;
   }
-
   const allEl  = $("#c-all");    if (allEl)  allEl.textContent  = c.all;
   const okEl   = $("#c-ok");     if (okEl)   okEl.textContent   = c.ok;
-  const hospEl = $("#c-hosp");   if (hospEl) hospEl.textContent = c.hosp;   // ← fixed
+  const hospEl = $("#c-hosp");   if (hospEl) hospEl.textContent = c.hosp;
   const jailEl = $("#c-jail");   if (jailEl) jailEl.textContent = c.jail;
   const travEl = $("#c-travel"); if (travEl) travEl.textContent = c.travel;
   const offEl  = $("#c-off");    if (offEl)  offEl.textContent  = c.off;
 }
-
 
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,(m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function escapeAttr(s){return String(s??"").replace(/"/g,"&quot;")}
@@ -400,15 +391,12 @@ addConfirm?.addEventListener("click",async ()=>{
   const source = activeTab==="#singleTab" ? singleInput.value : bulkText.value;
   let ids = extractIds(source);
 
-  // If single tab and no numeric id was found, and there is no API key,
-  // we can't resolve a username → id; show info modal.
   if(activeTab==="#singleTab" && !ids.length){
     saveKeyMaybe();
     if(!apiKeyPresent()){
       apiKeyInfoDlg.show();
       return;
     }
-    // try resolve via search
     addConfirm.disabled=true; addConfirm.textContent="Resolving…";
     const id = await resolveNameToId(source.trim()).catch(()=>null);
     addConfirm.disabled=false; addConfirm.textContent="Add";
@@ -449,10 +437,10 @@ $("#file")?.addEventListener("change",async(e)=>{
   finally{ e.target.value=""; }
 });
 btnSave?.addEventListener("click",()=>{
-  const payload={app:"Torn Targets",version:APP_VERSION,exportedAt:new Date().toISOString(),targets:state.targets};
+  const payload={app:"Target Tracker",version:APP_VERSION,exportedAt:new Date().toISOString(),targets:state.targets};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
-  a.download=`torn-targets-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(a.href);
+  a.download=`target-tracker-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(a.href);
   setStatus("Exported list as JSON.", false);
 });
 function importFromJSON(text){
@@ -468,10 +456,11 @@ function importFromJSON(text){
   }catch(e){ console.error(e); alert("Invalid targets JSON."); }
 }
 
-/* ================== FETCH DIALOG (brilliant, smoothed) ================== */
+/* ================== FETCH DIALOG (smoothed, inner glow, mobile-safe) ================== */
 const fetchDlgEl = $("#fetchDlg");
 const fetchDlg   = new bootstrap.Modal(fetchDlgEl);
 const ringFg     = $("#ringFg");
+const ringGlow   = $("#ringGlow");
 const ringPct    = $("#ringPct");
 const ringSub    = $("#ringSub");
 const ringIcon   = $("#ringIcon");
@@ -483,12 +472,12 @@ const statEta    = $("#statEta");
 
 // Smoothing + windowed rate controller
 const stats = {
-  windowSec: 12,        // rolling window size for rate (seconds)
-  alphaRate: 0.25,      // EMA smoothing for rate
-  alphaEta:  0.22,      // EMA smoothing for ETA
+  windowSec: 12,
+  alphaRate: 0.25,
+  alphaEta:  0.22,
   startMs: 0,
   lastDone: 0,
-  times: [],            // completion timestamps (seconds)
+  times: [],
   rateEma: null,
   etaEma: null
 };
@@ -496,7 +485,6 @@ const stats = {
 let fetchStartMs = 0;
 
 $("#fetchCancel")?.addEventListener("click", ()=>{
-  // graceful stopping
   state.stop = true;
   setStatus("Stopping…", false);
   setFetchState("stopped");
@@ -521,6 +509,10 @@ function showLoading(flag){
     if (ringPct) ringPct.textContent="0%";
     if (ringSub) ringSub.textContent="Preparing…";
     if (ringIcon) ringIcon.classList.add("d-none");
+    if (ringGlow){
+      ringGlow.style.strokeDashoffset = "100";  // same math as ringFg
+      // dasharray already 100 from CSS
+    }
     setFetchState("fetching");
     resetStats();
 
@@ -533,6 +525,16 @@ function showLoading(flag){
   loadingOverlay?.classList.add("d-none");
 }
 
+/* Init totals immediately (prevents 0/0 on mobile) */
+function initFetchStats(total){
+  if (statTotal)  statTotal.textContent  = String(total);
+  if (statDone)   statDone.textContent   = "0";
+  if (statRate)   statRate.textContent   = "0";
+  if (statElapsed)statElapsed.textContent= "0s";
+  if (statEta)    statEta.textContent    = "—";
+  if (ringSub)    ringSub.textContent    = `0 / ${total}`;
+}
+
 /* Progress + Stats */
 function setProgress(pct, done=0, total=0){
   const p = Math.max(0, Math.min(100, Math.round(pct)));
@@ -542,17 +544,20 @@ function setProgress(pct, done=0, total=0){
   // ring
   updateRing(p);
   if (ringPct) ringPct.textContent = `${p}%`;
+
   if (total){
-    if (ringSub) ringSub.textContent = `${done} / ${total}`;
+    if (ringSub)  ringSub.textContent  = `${done} / ${total}`;
+    if (statDone)  statDone.textContent  = String(done);
+    if (statTotal) statTotal.textContent = String(total);
     updateStats(done, total);
   }
 }
 
-/* Smooth ring update */
+/* Smooth ring update + inner glow sync (same dash math => no 4 o'clock dot) */
 function updateRing(p){
-  if(!ringFg) return;
   const off = 100 - p;
-  ringFg.style.strokeDashoffset = String(off);
+  if (ringFg){   ringFg.style.strokeDashoffset = String(off); }
+  if (ringGlow){ ringGlow.style.strokeDashoffset = String(off); }
 }
 
 /* Stats helpers (smoothed) */
@@ -576,25 +581,18 @@ function updateStats(done, total){
   const nowSec = nowMs / 1000;
   const elapsedSec = Math.max(0.001, (nowMs - stats.startMs)/1000);
 
-  // Register newly completed items (handles concurrency bursts)
   const delta = Math.max(0, done - stats.lastDone);
   for (let i=0; i<delta; i++) stats.times.push(nowSec);
-
   stats.lastDone = done;
 
-  // Keep only timestamps within the active window (window length ≤ elapsed)
   const windowUsed = Math.min(stats.windowSec, Math.max(1, elapsedSec));
   const cutoff = nowSec - windowUsed;
   while (stats.times.length && stats.times[0] < cutoff) stats.times.shift();
 
-  // Windowed instantaneous rate (completions per second)
   const winCount = stats.times.length;
   const rateInstant = winCount / windowUsed;
 
-  // EMA-smoothed rate for display & ETA
   stats.rateEma = ema(stats.rateEma, rateInstant, stats.alphaRate);
-
-  // Compute ETA from smoothed rate; fallback to global avg early on
   const rateForEta =
     (stats.rateEma && stats.rateEma > 0.0001) ? stats.rateEma :
     (done > 0 ? (done / elapsedSec) : 0);
@@ -602,27 +600,17 @@ function updateStats(done, total){
   const remaining = Math.max(0, total - done);
   const etaNew = rateForEta > 0 ? remaining / rateForEta : Infinity;
 
-  // EMA-smoothed ETA to avoid bouncing
   if (isFinite(etaNew)) stats.etaEma = ema(stats.etaEma, etaNew, stats.alphaEta);
 
-  // Update UI (stable formatting)
-  if (statDone)    statDone.textContent = String(done);
-  if (statTotal)   statTotal.textContent = String(total);
-
-  // Rate
-  const rateShow = Math.max(0, rateForEta);
-  if (statRate)    statRate.textContent = rateShow < 10 ? rateShow.toFixed(1) : String(Math.round(rateShow));
-
-  // Elapsed
+  if (statRate){
+    const rateShow = Math.max(0, rateForEta);
+    statRate.textContent = rateShow < 10 ? rateShow.toFixed(1) : String(Math.round(rateShow));
+  }
   if (statElapsed) statElapsed.textContent = formatDuration(elapsedSec);
-
-  // ETA
-  if (remaining === 0){
-    if (statEta) statEta.textContent = "0s";
-  } else if (!isFinite(etaNew) || rateShow <= 0 || stats.etaEma == null) {
-    if (statEta) statEta.textContent = "—";
-  } else {
-    if (statEta) statEta.textContent = formatDuration(stats.etaEma);
+  if (statEta){
+    if (remaining === 0) statEta.textContent = "0s";
+    else if (!isFinite(etaNew) || rateForEta <= 0 || stats.etaEma == null) statEta.textContent = "—";
+    else statEta.textContent = formatDuration(stats.etaEma);
   }
 }
 function formatDuration(sec){
@@ -657,7 +645,6 @@ function setFetchState(mode){
 /* Finalize animation then close */
 async function finalizeFetchUI(mode){
   if (mode==="complete"){
-    // sweep to 100 if not there yet
     updateRing(100);
     if (ringPct) ringPct.textContent = "100%";
     if (ringSub) ringSub.textContent = "Complete";
@@ -684,8 +671,11 @@ async function startFetchAll(){
   showLoading(true);
   setProgress(0);
 
-  const q=[...state.targets]; let done=0;
+  const q=[...state.targets];
+  let done=0;
   const total=q.length;
+
+  initFetchStats(total); // show totals immediately
 
   const worker=async()=>{
     while(!state.stop && q.length){
@@ -700,11 +690,9 @@ async function startFetchAll(){
 
   render();
 
-  // Finalize with a brief, satisfying finish before closing
   await finalizeFetchUI(state.stop ? "stopped" : "complete");
   setStatus(state.stop ? "Stopped by user." : "Fetch complete.", false);
 }
-
 
 async function fetchOne(id){
   const url=`https://api.torn.com/user/${encodeURIComponent(id)}?selections=basic,profile&key=${encodeURIComponent(state.apiKey)}`;
@@ -787,13 +775,10 @@ offcanvasEl?.addEventListener("show.bs.offcanvas", ()=>{
   const frag = document.createDocumentFragment();
   src.querySelectorAll(".card.glass").forEach(card=>{
     const clone = card.cloneNode(true);
-    // keep data-action buttons, but drop ids to avoid duplicates
     clone.querySelectorAll("[id]").forEach(n=>{
-      // keep specific ids for inputs we read directly
       if(n.id==="addDlg" || n.id==="bulkDlg" ) return;
       n.removeAttribute("id");
     });
-    // annotate binds for api key & remember
     clone.querySelector('input[type="password"]')?.setAttribute("data-bind","apiKey");
     clone.querySelector('input[type="checkbox"]')?.setAttribute("data-bind","rememberKey");
     frag.appendChild(clone);
@@ -801,35 +786,13 @@ offcanvasEl?.addEventListener("show.bs.offcanvas", ()=>{
   dest.appendChild(frag);
 });
 
-/* ---------------- About modal (updated) ---------------- */
+/* About modal */
 btnAbout?.addEventListener("click", async ()=>{
-  // version + theme
-  const ver = $("#aboutVersion");
-  const verF = $("#aboutVersionFooter");
-  const themeLbl = $("#aboutThemeLabel");
-  const themeLblF = $("#aboutThemeLabelFooter");
-
-  if (ver)  ver.textContent  = APP_VERSION;
-  if (verF) verF.textContent = APP_VERSION;
-
-  const theme = localStorage.getItem("theme") || "dark";
-  const themeText = `Theme: ${theme}`;
-  if (themeLbl)  themeLbl.textContent  = themeText.replace("Theme: ", "");
-  if (themeLblF) themeLblF.textContent = themeText;
-
-  // quick stats
-  const tCount = state.targets.length;
-  const aboutTargets = $("#aboutTargets");
-  const aboutSavedMeta = $("#aboutSavedMeta");
-  if (aboutTargets)   aboutTargets.textContent = String(tCount);
-  if (aboutSavedMeta) aboutSavedMeta.textContent = ($("#savedMeta")?.textContent || "—");
-
-  // avatar
+  const ver = $("#aboutVersion"); if (ver) ver.textContent = APP_VERSION;
+  const themeLbl = $("#aboutThemeLabel"); if (themeLbl) themeLbl.textContent = `Theme: ${localStorage.getItem("theme") || "dark"}`;
   await ensureAboutAvatar();
-
   new bootstrap.Modal($("#aboutDlg")).show();
 });
-
 $("#copyIdBtn")?.addEventListener("click", async ()=>{
   try{
     await navigator.clipboard.writeText(ABOUT_TORN_ID);
@@ -840,7 +803,6 @@ $("#copyIdBtn")?.addEventListener("click", async ()=>{
     }
   }catch{}
 });
-
 async function ensureAboutAvatar(){
   const avatar = $("#aboutAvatar");
   if(!avatar || avatar.dataset.loaded === "1") return;
