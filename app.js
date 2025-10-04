@@ -1,5 +1,5 @@
 /* Torn Targets UI — crisp fetch ring, hover states, rounded table */
-const APP_VERSION = "2.6.0";
+const APP_VERSION = "2.6.1";
 const STORE_KEY = "tornTargets.data.v2";
 const KEY_KEY   = "tornTargets.apiKey.v1";
 const ABOUT_TORN_ID = "3212954";
@@ -135,6 +135,20 @@ function saveKeyMaybe(){
   state.apiKey=apiKeyEl.value.trim();
   if(rememberKeyEl.checked && state.apiKey) localStorage.setItem(KEY_KEY,state.apiKey);
   else localStorage.removeItem(KEY_KEY);
+}
+
+/* When saving from the mobile offcanvas, read from the clone and mirror back */
+function readFromOffcanvasIfPresent(){
+  const oc = document.getElementById("sidebarOffcanvas");
+  if(!oc) return;
+  const cloneApi = oc.querySelector('[data-bind="apiKey"]');
+  const cloneRemember = oc.querySelector('[data-bind="rememberKey"]');
+  if(cloneApi){
+    apiKeyEl.value = cloneApi.value;
+  }
+  if(cloneRemember){
+    rememberKeyEl.checked = cloneRemember.checked;
+  }
 }
 
 /* ---------- Layout calc (table-only scroll) ---------- */
@@ -276,7 +290,7 @@ chipsWrap.addEventListener("click",(e)=>{
 });
 searchBoxEl.addEventListener("input",()=>render());
 
-/* --- Sidebar actions: deck + mobile clone via delegation --- */
+/* --- Sidebar actions for desktop + mobile clone (event delegation) --- */
 document.addEventListener("click",(e)=>{
   const act = e.target.closest("[data-action]")?.dataset.action;
   if(!act) return;
@@ -293,7 +307,7 @@ document.addEventListener("click",(e)=>{
   }
 });
 
-/* Keep direct hooks (desktop IDs) — call same helpers */
+/* Keep direct hooks for desktop IDs */
 btnAddDialog?.addEventListener("click",()=>openAddDialog("single", true));
 btnBulk?.addEventListener("click",()=>openAddDialog("bulk", true));
 
@@ -306,7 +320,6 @@ function closeOffcanvasIfOpen(){
 }
 function openAddDialog(tab="single", fromSidebar=false){
   if(fromSidebar) closeOffcanvasIfOpen();
-  // prevent duplicate opens if both delegated & direct fire
   if(addDlgEl.classList.contains("show")) return;
 
   new bootstrap.Tab(document.querySelector(`[data-bs-target="#${tab==="single"?"singleTab":"bulkTab"}"]`)).show();
@@ -395,6 +408,8 @@ function importFromJSON(text){
 
 /* Fetching */
 btnFetch.addEventListener("click",()=>{
+  // If the user typed the key in the offcanvas, mirror it first.
+  readFromOffcanvasIfPresent();
   if(!apiKeyPresent()) { showApiKeyInfo(); return; }
   startFetchAll();
 });
@@ -533,10 +548,25 @@ offcanvasEl?.addEventListener("show.bs.offcanvas", ()=>{
   const frag = document.createDocumentFragment();
   src.querySelectorAll(".card.glass").forEach(card=>{
     const clone = card.cloneNode(true);
+    // remove only IDs; keep data-bind so we can mirror values
     clone.querySelectorAll("[id]").forEach(n=>n.removeAttribute("id"));
     frag.appendChild(clone);
   });
   dest.appendChild(frag);
+
+  // Prefill the cloned inputs with the real values
+  const cloneApi = dest.querySelector('[data-bind="apiKey"]');
+  const cloneRemember = dest.querySelector('[data-bind="rememberKey"]');
+  if(cloneApi) cloneApi.value = apiKeyEl.value;
+  if(cloneRemember) cloneRemember.checked = rememberKeyEl.checked;
+
+  // Live sync from the clone back to real fields so actions work even without pressing Save
+  dest.addEventListener("input",(ev)=>{
+    if(ev.target.matches('[data-bind="apiKey"]')) apiKeyEl.value = ev.target.value;
+  });
+  dest.addEventListener("change",(ev)=>{
+    if(ev.target.matches('[data-bind="rememberKey"]')) rememberKeyEl.checked = ev.target.checked;
+  }, { once:false });
 });
 
 /* About modal */
@@ -575,11 +605,18 @@ async function ensureAboutAvatar(){
 function showApiKeyInfo(){ keyInfoDlg.show(); }
 keyFocusBtn?.addEventListener("click", ()=>{
   keyInfoDlg.hide();
-  document.getElementById("apiKey")?.scrollIntoView({behavior:"smooth", block:"center"});
-  setTimeout(()=>document.getElementById("apiKey")?.focus(), 350);
+  // Open the offcanvas on small screens for convenience
+  if(window.innerWidth < 992){
+    const inst = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
+    inst.show();
+  }
+  setTimeout(()=>{
+    document.querySelector('[data-bind="apiKey"]')?.focus();
+  }, 300);
 });
 function saveApiAndCloseSidebar(){
-  rememberKeyEl.checked = true;
+  // If the user typed inside the offcanvas, mirror first
+  readFromOffcanvasIfPresent();
   saveKeyMaybe();
   setStatus(state.apiKey ? "API key saved." : "API key cleared.", false);
   closeOffcanvasIfOpen();

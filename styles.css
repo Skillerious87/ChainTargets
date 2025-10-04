@@ -176,7 +176,11 @@ body { background: var(--bg-grad); overflow: hidden; }
   padding-bottom: var(--safe-bottom);
 }
 .offcanvas-header{ border-bottom:1px solid var(--border); }
-.offcanvas-body{ display:flex; flex-direction:column; gap:12px; }
+.offcanvas-body{
+  display:flex; flex-direction:column; gap:12px;
+  /* keep content clear of the fixed status bar on mobile */
+  padding-bottom: calc(var(--statusbar-h) + var(--safe-bottom) + 16px);
+}
 #sidebarClone{ flex:1 1 auto; overflow:auto; padding-right:4px; }
 #sidebarClone::-webkit-scrollbar{ width:8px; }
 #sidebarClone::-webkit-scrollbar-thumb{
@@ -185,7 +189,12 @@ body { background: var(--bg-grad); overflow: hidden; }
 }
 #sidebarClone::-webkit-scrollbar-thumb:hover{ background: rgba(125,211,252,.3); }
 :root[data-bs-theme="light"] #sidebarClone::-webkit-scrollbar-thumb{ background: rgba(2,132,199,.22); }
-.sticky-bottom-tile{ position: sticky; bottom: 0; z-index: 2; background: linear-gradient(180deg, var(--glass-1), var(--glass-2)); }
+.sticky-bottom-tile{
+  position: sticky;
+  bottom: calc(var(--statusbar-h) + var(--safe-bottom));
+  z-index: 2;
+  background: linear-gradient(180deg, var(--glass-1), var(--glass-2));
+}
 
 /* Table-only scrolling region */
 .main-shell{ height: calc(100vh - var(--topbar-h) - var(--statusbar-h) - var(--safe-bottom)); overflow: hidden; }
@@ -197,22 +206,63 @@ body { background: var(--bg-grad); overflow: hidden; }
   padding-bottom: calc(var(--statusbar-h) + var(--safe-bottom) + 16px) !important;
 }
 
-/* Table styles & rounded bottom corners */
+/* ---------- TABLE: bulletproof rounded corners (no poke-through) ---------- */
 .table-wrap{
-  position:relative; border-radius: var(--radius);
-  overflow: hidden;
+  position:relative;
+  border-radius: var(--radius);
+  overflow:hidden;
+  background: transparent;
+  -webkit-mask:
+    radial-gradient(var(--radius) at left  top, #000 98%, #0000 101%) top left,
+    radial-gradient(var(--radius) at right top, #000 98%, #0000 101%) top right,
+    radial-gradient(var(--radius) at right bottom, #000 98%, #0000 101%) bottom right,
+    radial-gradient(var(--radius) at left  bottom, #000 98%, #0000 101%) bottom left,
+    linear-gradient(#000 0 0) center;
+  -webkit-mask-size: var(--radius) var(--radius), var(--radius) var(--radius), var(--radius) var(--radius), var(--radius) var(--radius), 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+          mask:
+    radial-gradient(var(--radius) at left  top, #000 98%, #0000 101%) top left,
+    radial-gradient(var(--radius) at right top, #000 98%, #0000 101%) top right,
+    radial-gradient(var(--radius) at right bottom, #000 98%, #0000 101%) bottom right,
+    radial-gradient(var(--radius) at left  bottom, #000 98%, #0000 101%) bottom left,
+    linear-gradient(#000 0 0) center;
+  mask-size: var(--radius) var(--radius), var(--radius) var(--radius), var(--radius) var(--radius), var(--radius) var(--radius), 100% 100%;
+  mask-repeat: no-repeat;
 }
-/* Clip inner content to guarantee perfect rounded corners on all UA */
+
+/* Inner clip (defensive for wider support) */
 .table-clip{ position: relative; clip-path: inset(0 round var(--radius)); }
 
-.table-modern{ --bs-table-bg: var(--tbl-bg); --bs-table-color: var(--tbl-color); border-collapse: separate; border-spacing:0; }
+/* Table core */
+.table-modern{
+  --bs-table-bg: var(--tbl-bg);
+  --bs-table-color: var(--tbl-color);
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Sticky header */
 .table-modern thead th{
-  position: sticky; top: 0; z-index: 1;
+  position: sticky;
+  top: 0;
+  z-index: 1;
   background: var(--thead-grad);
   border-bottom: 1px solid var(--border);
-  font-size: .8rem; letter-spacing: .2px; font-weight: 800;
+  font-size: .8rem;
+  letter-spacing: .2px;
+  font-weight: 800;
   padding: .85rem 1rem;
 }
+.table-modern thead th:first-child{
+  border-top-left-radius: calc(var(--radius) - 1px);
+  background-clip: padding-box;
+}
+.table-modern thead th:last-child{
+  border-top-right-radius: calc(var(--radius) - 1px);
+  background-clip: padding-box;
+}
+
+/* Body cells */
 .table-modern tbody td{
   padding: .9rem 1rem;
   border-bottom-color: rgba(0,0,0,.06) !important;
@@ -220,6 +270,12 @@ body { background: var(--bg-grad); overflow: hidden; }
 :root[data-bs-theme="dark"] .table-modern tbody td{ border-bottom-color: rgba(255,255,255,.06) !important; }
 .table-modern tbody tr:hover{ background: rgba(125,211,252,.08) !important; cursor: pointer; }
 .table-modern tbody tr:last-child td{ border-bottom: 0 !important; }
+
+/* Empty overlay */
+.table-empty{
+  position:absolute; top:56px; left:14px; right:14px; bottom: calc(14px + var(--safe-bottom));
+  display:grid; place-items:center; border:1px dashed var(--border); border-radius: var(--radius);
+}
 
 /* Sort indicators */
 th.sortable{ cursor:pointer; }
@@ -233,12 +289,6 @@ th.sortable.sort-asc::after{ border-top-color: transparent; border-bottom-color:
 :root[data-bs-theme="dark"] th.sortable.sort-asc::after{ border-bottom-color: rgba(255,255,255,.85); }
 th.sortable.sort-desc::after{ border-top-color: rgba(0,0,0,.75); }
 :root[data-bs-theme="dark"] th.sortable.sort-desc::after{ border-top-color: rgba(255,255,255,.85); }
-
-/* Filtered-empty overlay — respect safe area */
-.table-empty{
-  position:absolute; top:56px; left:14px; right:14px; bottom: calc(14px + var(--safe-bottom));
-  display:grid; place-items:center; border:1px dashed var(--border); border-radius: var(--radius);
-}
 
 /* Checkboxes */
 #grid input[type="checkbox"]{ width: 18px; height: 18px; }
@@ -258,11 +308,11 @@ th.sortable.sort-desc::after{ border-top-color: rgba(0,0,0,.75); }
 /* Empty graphic */
 .empty-graphic{ width:240px; color: var(--brand); opacity:.9; filter: drop-shadow(0 8px 40px rgba(14,165,233,.25)); }
 
-/* Loading overlay (fallback) */
+/* Loading overlay */
 .loading-overlay{ position:absolute; inset:0; display:grid; place-items:center; background: rgba(0,0,0,.35); border-radius: var(--radius); animation: fadeIn .2s ease-out both; }
 :root[data-bs-theme="light"] .loading-overlay{ background: rgba(0,0,0,.12); }
 
-/* Status bar — add safe area padding */
+/* Status bar */
 .statusbar-fixed{
   position: fixed; left:0; right:0; bottom:0; z-index: 1050;
   height: calc(var(--statusbar-h) + var(--safe-bottom));
