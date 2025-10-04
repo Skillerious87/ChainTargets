@@ -95,8 +95,14 @@
                   <input class="form-check-input" type="checkbox" id="rememberKey" checked>
                   <label class="form-check-label small" for="rememberKey">Remember API key on this device</label>
                 </div>
+                <!-- NEW: Save API key button (works in desktop + mobile clone) -->
+                <div class="d-grid mt-2">
+                  <button class="btn btn-primary btn-sm" data-action="save-api">
+                    <i class="bi bi-key me-1"></i> Save API key
+                  </button>
+                </div>
 
-                <button class="btn btn-ghost btn-sm w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#advanced" aria-expanded="false">
+                <button class="btn btn-ghost btn-sm w-100 text-start collapsed mt-2" data-bs-toggle="collapse" data-bs-target="#advanced" aria-expanded="false">
                   <i class="bi bi-gear me-1"></i> Advanced
                 </button>
                 <div id="advanced" class="collapse mt-2">
@@ -127,13 +133,13 @@
               <div class="card-body">
                 <div class="d-flex align-items-center justify-content-between">
                   <div class="text-uppercase text-secondary fw-bold small">Targets</div>
-                  <button id="btn-add-dialog" class="btn btn-primary btn-sm">
+                  <button id="btn-add-dialog" class="btn btn-primary btn-sm" data-action="open-add">
                     <i class="bi bi-plus-lg me-1"></i> Add
                   </button>
                 </div>
 
                 <div class="d-flex gap-2 mt-2 flex-wrap">
-                  <button id="btn-bulk" class="btn btn-ghost btn-sm card-action">
+                  <button id="btn-bulk" class="btn btn-ghost btn-sm card-action" data-action="open-bulk">
                     <i class="bi bi-card-list me-1"></i> Bulk add
                   </button>
                   <button id="btn-remove" class="btn btn-ghost btn-sm card-action">
@@ -258,23 +264,25 @@
 
                 <!-- Table -->
                 <div id="tableWrap" class="table-responsive table-wrap d-none">
-                  <table id="grid" class="table table-modern table-hover align-middle mb-0">
-                    <thead class="table-header">
-                      <tr>
-                        <th style="width:44px"><input type="checkbox" id="chk-all" /></th>
-                        <th data-sort="id" class="sortable">ID</th>
-                        <th data-sort="name" class="sortable">Name</th>
-                        <th data-sort="level" class="sortable">Level</th>
-                        <th data-sort="status" class="sortable">Status</th>
-                        <th data-sort="last" class="sortable">Last action</th>
-                      </tr>
-                    </thead>
-                    <tbody id="tbody"></tbody>
-                  </table>
-                  <div id="tableEmpty" class="table-empty d-none">
-                    <div class="p-4 text-center">
-                      <div class="fw-semibold">No rows match your filters</div>
-                      <div class="text-secondary small">Try clearing search or choosing a different status.</div>
+                  <div class="table-clip">
+                    <table id="grid" class="table table-modern table-hover align-middle mb-0">
+                      <thead class="table-header">
+                        <tr>
+                          <th style="width:44px"><input type="checkbox" id="chk-all" /></th>
+                          <th data-sort="id" class="sortable">ID</th>
+                          <th data-sort="name" class="sortable">Name</th>
+                          <th data-sort="level" class="sortable">Level</th>
+                          <th data-sort="status" class="sortable">Status</th>
+                          <th data-sort="last" class="sortable">Last action</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tbody"></tbody>
+                    </table>
+                    <div id="tableEmpty" class="table-empty d-none">
+                      <div class="p-4 text-center">
+                        <div class="fw-semibold">No rows match your filters</div>
+                        <div class="text-secondary small">Try clearing search or choosing a different status.</div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -379,6 +387,7 @@ Name [998877]"></textarea>
         <div class="modal-content glass">
           <div class="modal-body py-4 text-center">
             <div class="ring-wrap mx-auto mb-3">
+              <div class="ring-halo"></div>
               <svg class="ring-svg" viewBox="0 0 120 120" aria-hidden="true">
                 <circle class="ring-bg" cx="60" cy="60" r="52"/>
                 <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52" pathLength="100"/>
@@ -451,6 +460,57 @@ Name [998877]"></textarea>
           <div class="modal-footer justify-content-between">
             <span class="text-secondary small">v<span id="aboutVersion">—</span> • <span id="aboutThemeLabel">Theme: —</span></span>
             <button class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Key Required Modal (already in your app) -->
+    <div class="modal fade" id="apiKeyInfoDlg" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content glass keymodal">
+          <div class="keymodal-hero">
+            <div class="keymodal-icon">
+              <i class="bi bi-key-fill"></i>
+            </div>
+            <div>
+              <h5 class="mb-1">Limited Access key required</h5>
+              <div class="text-secondary">We need a Torn API key to fetch names, levels, live status, and last actions.</div>
+            </div>
+          </div>
+          <div class="modal-body pt-0">
+            <div class="row g-3">
+              <div class="col-md-7">
+                <ul class="small mb-3 ps-3">
+                  <li>Use a <strong>Limited Access</strong> user key (safe &amp; recommended).</li>
+                  <li>Scopes used: <code>basic</code>, <code>profile</code>.</li>
+                  <li>Your key is stored locally only on this device.</li>
+                </ul>
+                <div class="d-flex gap-2 flex-wrap">
+                  <a class="btn btn-ghost" href="https://www.torn.com/preferences.php?tab=api" target="_blank" rel="noopener">
+                    <i class="bi bi-box-arrow-up-right me-1"></i> Open Torn API page
+                  </a>
+                  <button id="keyFocusBtn" class="btn btn-primary">
+                    <i class="bi bi-clipboard-check me-1"></i> I’ll add my key
+                  </button>
+                </div>
+              </div>
+              <div class="col-md-5">
+                <div class="glass p-3 keymodal-note">
+                  <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-shield-lock"></i>
+                    <div class="fw-semibold">Privacy</div>
+                  </div>
+                  <div class="small text-secondary">
+                    This app runs entirely in your browser. No servers, no tracking. Your API key never leaves your device.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer justify-content-between">
+            <span class="text-secondary small">Tip: keep “Remember API key” checked for convenience.</span>
+            <button class="btn btn-ghost" data-bs-dismiss="modal">Close</button>
           </div>
         </div>
       </div>

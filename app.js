@@ -1,5 +1,5 @@
 /* Torn Targets UI — crisp fetch ring, hover states, rounded table */
-const APP_VERSION = "2.4.1";
+const APP_VERSION = "2.6.0";
 const STORE_KEY = "tornTargets.data.v2";
 const KEY_KEY   = "tornTargets.apiKey.v1";
 const ABOUT_TORN_ID = "3212954";
@@ -40,31 +40,25 @@ const btnAddDialog=$("#btn-add-dialog"), btnBulk=$("#btn-bulk"), btnRemove=$("#b
 
 const loadingOverlay=$("#loadingOverlay");
 
-/* Add Target modal */
+/* Modals */
 const addDlgEl=$("#addDlg"); const addDlg = new bootstrap.Modal(addDlgEl);
 const singleInput=$("#singleInput"), singleHint=$("#singleHint");
-const bulkText=$("#bulkText"), bulkHint=$("#bulkHint");
-const addConfirm=$("#addConfirm");
+const bulkText=$("#bulkText"), bulkHint=$("#bulkHint"); const addConfirm=$("#addConfirm");
 
-/* Legacy bulk modal */
 const bulkDlg = new bootstrap.Modal($("#bulkDlg"));
-const bulkTextLegacy=$("#bulkTextLegacy");
-const bulkConfirmLegacy=$("#bulkConfirmLegacy");
 
-/* Fetch modal */
-const fetchDlgEl = $("#fetchDlg");
-const fetchDlg   = new bootstrap.Modal(fetchDlgEl);
-const ringFg     = $("#ringFg");
-const ringPct    = $("#ringPct");
-const ringSub    = $("#ringSub");
+const fetchDlg   = new bootstrap.Modal($("#fetchDlg"));
+const ringFg     = $("#ringFg"); const ringPct = $("#ringPct"); const ringSub = $("#ringSub");
 $("#fetchCancel")?.addEventListener("click", ()=>{ state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); });
 
-/* About modal */
 const aboutDlg = new bootstrap.Modal($("#aboutDlg"));
-const aboutAvatar = $("#aboutAvatar");
-const aboutVersion = $("#aboutVersion");
-const aboutThemeLabel = $("#aboutThemeLabel");
-const copyIdBtn = $("#copyIdBtn");
+const aboutAvatar = $("#aboutAvatar"); const aboutVersion = $("#aboutVersion"); const aboutThemeLabel = $("#aboutThemeLabel"); const copyIdBtn = $("#copyIdBtn");
+
+const keyInfoDlg = new bootstrap.Modal($("#apiKeyInfoDlg"));
+const keyFocusBtn = $("#keyFocusBtn");
+
+/* Offcanvas */
+const offcanvasEl = document.getElementById("sidebarOffcanvas");
 
 /* Status Bar */
 const statusBarText = $("#statusText");
@@ -94,7 +88,7 @@ function initTheme(){
   const mode = localStorage.getItem(THEME_KEY) || "dark";
   setTheme(mode, false);
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{
-    const m = localStorage.getItem(THEME_KEY)||"auto";
+    const m = localStorage.getItem("theme")||"auto";
     if(m==="auto") setTheme("auto", false);
   });
 }
@@ -282,15 +276,45 @@ chipsWrap.addEventListener("click",(e)=>{
 });
 searchBoxEl.addEventListener("input",()=>render());
 
-/* Add / Remove / Clear */
-btnAddDialog.addEventListener("click",()=>openAddDialog("single"));
-ctaAdd.addEventListener("click",()=>openAddDialog("single"));
-function openAddDialog(tab){
+/* --- Sidebar actions: deck + mobile clone via delegation --- */
+document.addEventListener("click",(e)=>{
+  const act = e.target.closest("[data-action]")?.dataset.action;
+  if(!act) return;
+
+  if(act==="save-api"){
+    e.preventDefault();
+    saveApiAndCloseSidebar();
+  }else if(act==="open-add"){
+    e.preventDefault();
+    openAddDialog("single", true);
+  }else if(act==="open-bulk"){
+    e.preventDefault();
+    openAddDialog("bulk", true);
+  }
+});
+
+/* Keep direct hooks (desktop IDs) — call same helpers */
+btnAddDialog?.addEventListener("click",()=>openAddDialog("single", true));
+btnBulk?.addEventListener("click",()=>openAddDialog("bulk", true));
+
+ctaAdd.addEventListener("click",()=>openAddDialog("single", false));
+
+function closeOffcanvasIfOpen(){
+  if(!offcanvasEl) return;
+  const inst = bootstrap.Offcanvas.getInstance(offcanvasEl) || bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
+  if(offcanvasEl.classList.contains("show")) inst.hide();
+}
+function openAddDialog(tab="single", fromSidebar=false){
+  if(fromSidebar) closeOffcanvasIfOpen();
+  // prevent duplicate opens if both delegated & direct fire
+  if(addDlgEl.classList.contains("show")) return;
+
   new bootstrap.Tab(document.querySelector(`[data-bs-target="#${tab==="single"?"singleTab":"bulkTab"}"]`)).show();
   singleInput.value=""; singleHint.textContent="Waiting for input…";
   bulkText.value=""; bulkHint.textContent="0 valid IDs detected.";
   addDlg.show();
 }
+
 singleInput.addEventListener("input",()=>{
   const ids=extractIds(singleInput.value);
   singleHint.textContent = ids.length ? `Resolved → ${ids.join(", ")}` : `No valid ID found yet. Paste an ID or Torn profile URL.`;
@@ -312,19 +336,26 @@ addConfirm.addEventListener("click",async ()=>{
   if(!ids.length){ singleHint.textContent="No valid IDs found. Try a different input."; return; }
   let added=0; for(const id of ids){ if(!state.targets.includes(id)){ state.targets.push(id); added++; } }
   sortTargets(); render(); addDlg.hide();
-  if(added>0 && state.apiKey) startFetchAll();
   setStatus("Targets updated.", false);
+
+  if(!state.apiKey){ showApiKeyInfo(); } else { startFetchAll(); }
 });
-btnBulk.addEventListener("click",()=>bulkDlg.show());
-bulkConfirmLegacy.addEventListener("click",()=>{
+
+/* Bulk (legacy textarea) */
+const bulkTextLegacy=$("#bulkTextLegacy");
+const bulkConfirmLegacy=$("#bulkConfirmLegacy");
+bulkConfirmLegacy?.addEventListener("click",()=>{
   const ids=extractIds(bulkTextLegacy.value);
   let added=0; for(const id of ids){ if(!state.targets.includes(id)){ state.targets.push(id); added++; } }
-  bulkTextLegacy.value=""; bulkDlg.hide();
+  bulkTextLegacy.value=""; new bootstrap.Modal($("#bulkDlg")).hide?.();
   if(!added) alert("No new IDs found.");
   sortTargets(); render();
   setStatus("Targets updated.", false);
+  if(!state.apiKey) showApiKeyInfo();
 });
-btnRemove.addEventListener("click",()=>{
+
+/* Remove / Clear */
+btnRemove?.addEventListener("click",()=>{
   const selected=[...tbody.querySelectorAll("tr")].filter(tr=>tr.querySelector(".rowchk")?.checked).map(tr=>tr.dataset.id);
   if(!selected.length) return alert("Select rows to remove.");
   state.targets=state.targets.filter(id=>!selected.includes(id));
@@ -332,9 +363,9 @@ btnRemove.addEventListener("click",()=>{
   render();
   setStatus("Removed selected targets.", false);
 });
-btnClear.addEventListener("click",()=>{ if(confirm("Clear all targets?")){ state.targets=[]; state.results={}; render(); setStatus("Cleared target list.", false);} });
+btnClear?.addEventListener("click",()=>{ if(confirm("Clear all targets?")){ state.targets=[]; state.results={}; render(); setStatus("Cleared target list.", false);} });
 
-/* Open/Save */
+/* Open/Save file */
 btnOpen.addEventListener("click",()=>$("#file").click());
 ctaOpen.addEventListener("click",()=>$("#file").click());
 $("#file").addEventListener("change",async(e)=>{
@@ -363,13 +394,21 @@ function importFromJSON(text){
 }
 
 /* Fetching */
-btnFetch.addEventListener("click",()=>startFetchAll());
+btnFetch.addEventListener("click",()=>{
+  if(!apiKeyPresent()) { showApiKeyInfo(); return; }
+  startFetchAll();
+});
 btnStop.addEventListener("click",()=>{ state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); });
 btnResetCols.addEventListener("click",()=>{ /* future column prefs */ });
 
+function apiKeyPresent(){
+  saveKeyMaybe();
+  return !!state.apiKey;
+}
+
 async function startFetchAll(){
   saveKeyMaybe();
-  if(!state.apiKey) return alert("Paste your Torn API key first.");
+  if(!state.apiKey) return;
   if(!state.targets.length) return alert("No targets to fetch.");
 
   state.stop=false;
@@ -486,7 +525,6 @@ apiKeyEl.addEventListener("change",saveKeyMaybe);
 rememberKeyEl.addEventListener("change",saveKeyMaybe);
 
 /* Offcanvas clone (mobile) */
-const offcanvasEl = document.getElementById("sidebarOffcanvas");
 offcanvasEl?.addEventListener("show.bs.offcanvas", ()=>{
   const src = document.getElementById("sidebar");
   const dest = document.getElementById("sidebarClone");
@@ -531,6 +569,20 @@ async function ensureAboutAvatar(){
   if(!url) url = `https://www.torn.com/signature.php?user=${ABOUT_TORN_ID}`;
   aboutAvatar.src = url;
   aboutAvatar.dataset.loaded = "1";
+}
+
+/* API key helpers */
+function showApiKeyInfo(){ keyInfoDlg.show(); }
+keyFocusBtn?.addEventListener("click", ()=>{
+  keyInfoDlg.hide();
+  document.getElementById("apiKey")?.scrollIntoView({behavior:"smooth", block:"center"});
+  setTimeout(()=>document.getElementById("apiKey")?.focus(), 350);
+});
+function saveApiAndCloseSidebar(){
+  rememberKeyEl.checked = true;
+  saveKeyMaybe();
+  setStatus(state.apiKey ? "API key saved." : "API key cleared.", false);
+  closeOffcanvasIfOpen();
 }
 
 /* Init */
