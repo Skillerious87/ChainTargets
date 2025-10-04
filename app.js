@@ -1,5 +1,5 @@
 /* Torn Targets UI — crisp fetch ring, hover states, rounded table */
-const APP_VERSION = "2.6.1";
+const APP_VERSION = "2.9.3";
 const STORE_KEY = "tornTargets.data.v2";
 const KEY_KEY   = "tornTargets.apiKey.v1";
 const ABOUT_TORN_ID = "3212954";
@@ -10,7 +10,7 @@ const state = {
   targets: [],
   results: {},
   settings: { concurrency: 2, throttleMs: 1500, useProxy: false, proxyUrl: "" },
-  sort: { key: "id", dir: 1 },
+  sort: { key: "id", dir: 1 }, // dir: 1 asc, -1 desc
   stop: false
 };
 
@@ -40,27 +40,24 @@ const btnAddDialog=$("#btn-add-dialog"), btnBulk=$("#btn-bulk"), btnRemove=$("#b
 
 const loadingOverlay=$("#loadingOverlay");
 
-/* Modals */
-const addDlgEl=$("#addDlg"); const addDlg = new bootstrap.Modal(addDlgEl);
+/* Add Target modal */
 const singleInput=$("#singleInput"), singleHint=$("#singleHint");
-const bulkText=$("#bulkText"), bulkHint=$("#bulkHint"); const addConfirm=$("#addConfirm");
+const bulkText=$("#bulkText"), bulkHint=$("#bulkHint");
+const addConfirm=$("#addConfirm");
 
-const bulkDlg = new bootstrap.Modal($("#bulkDlg"));
+/* Legacy bulk modal */
+const bulkTextLegacy=$("#bulkTextLegacy");
+const bulkConfirmLegacy=$("#bulkConfirmLegacy");
 
-const fetchDlg   = new bootstrap.Modal($("#fetchDlg"));
-const ringFg     = $("#ringFg"); const ringPct = $("#ringPct"); const ringSub = $("#ringSub");
-$("#fetchCancel")?.addEventListener("click", ()=>{ state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); });
-
-const aboutDlg = new bootstrap.Modal($("#aboutDlg"));
-const aboutAvatar = $("#aboutAvatar"); const aboutVersion = $("#aboutVersion"); const aboutThemeLabel = $("#aboutThemeLabel"); const copyIdBtn = $("#copyIdBtn");
-
-const keyInfoDlg = new bootstrap.Modal($("#apiKeyInfoDlg"));
-const keyFocusBtn = $("#keyFocusBtn");
+/* Fetch modal */
+const ringFg     = $("#ringFg");
+const ringPct    = $("#ringPct");
+const ringSub    = $("#ringSub");
 
 /* Offcanvas */
 const offcanvasEl = document.getElementById("sidebarOffcanvas");
 
-/* Status Bar */
+/* ---------- Status Bar ---------- */
 const statusBarText = $("#statusText");
 const statusBarSaved = $("#savedMeta");
 const statusDot      = $("#statusDot");
@@ -69,7 +66,16 @@ function setStatus(msg, busy=false) {
   if (statusDot) statusDot.style.background = busy ? "#60a5fa" : "#36d39f";
 }
 
-/* Theme */
+/* Bootstrap-safe modal helpers */
+function modalGetOrCreate(selector){
+  const el = typeof selector === "string" ? $(selector) : selector;
+  if(!el) return null;
+  return bootstrap.Modal.getOrCreateInstance(el);
+}
+function modalShow(selector){ modalGetOrCreate(selector)?.show(); }
+function modalHide(selector){ modalGetOrCreate(selector)?.hide(); }
+
+/* ---------- Theme ---------- */
 const THEME_KEY="theme";
 document.querySelectorAll(".theme-choice").forEach(btn=>{
   btn.addEventListener("click",()=>setTheme(btn.dataset.theme||"auto", true));
@@ -106,9 +112,11 @@ function extractIds(input){
   return [...ids];
 }
 function persist(){
-  localStorage.setItem(STORE_KEY, JSON.stringify({
-    version:APP_VERSION, targets:state.targets, results:state.results, settings:state.settings
-  }));
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      version:APP_VERSION, targets:state.targets, results:state.results, settings:state.settings
+    }));
+  }catch(e){}
 }
 function restore(){
   try{
@@ -120,38 +128,38 @@ function restore(){
       if(data.settings && typeof data.settings==="object") state.settings={...state.settings,...data.settings};
     }
     const savedKey=localStorage.getItem(KEY_KEY);
-    if(savedKey){ state.apiKey=savedKey; apiKeyEl.value=savedKey; rememberKeyEl.checked=true; }
+    if(savedKey){ state.apiKey=savedKey; if(apiKeyEl) apiKeyEl.value=savedKey; if(rememberKeyEl) rememberKeyEl.checked=true; }
     applySettingsToUI();
     render();
   }catch(e){ console.warn("Restore failed",e); }
 }
 function applySettingsToUI(){
-  concurrencyEl.value=String(state.settings.concurrency);
-  throttleEl.value=String(state.settings.throttleMs);
-  useProxyEl.checked=state.settings.useProxy;
-  proxyUrlEl.value=state.settings.proxyUrl||"";
+  if(concurrencyEl) concurrencyEl.value=String(state.settings.concurrency);
+  if(throttleEl) throttleEl.value=String(state.settings.throttleMs);
+  if(useProxyEl) useProxyEl.checked=state.settings.useProxy;
+  if(proxyUrlEl) proxyUrlEl.value=state.settings.proxyUrl||"";
 }
-function saveKeyMaybe(){
-  state.apiKey=apiKeyEl.value.trim();
-  if(rememberKeyEl.checked && state.apiKey) localStorage.setItem(KEY_KEY,state.apiKey);
-  else localStorage.removeItem(KEY_KEY);
+function persistKeyToStorage(){
+  try{
+    const k = (apiKeyEl?.value || "").trim();
+    state.apiKey = k;
+    if(rememberKeyEl?.checked && k){
+      localStorage.setItem(KEY_KEY, k);
+    }else{
+      localStorage.removeItem(KEY_KEY);
+    }
+  }catch(e){}
 }
-
-/* When saving from the mobile offcanvas, read from the clone and mirror back */
 function readFromOffcanvasIfPresent(){
   const oc = document.getElementById("sidebarOffcanvas");
   if(!oc) return;
   const cloneApi = oc.querySelector('[data-bind="apiKey"]');
   const cloneRemember = oc.querySelector('[data-bind="rememberKey"]');
-  if(cloneApi){
-    apiKeyEl.value = cloneApi.value;
-  }
-  if(cloneRemember){
-    rememberKeyEl.checked = cloneRemember.checked;
-  }
+  if(cloneApi && apiKeyEl) apiKeyEl.value = cloneApi.value;
+  if(cloneRemember && rememberKeyEl) rememberKeyEl.checked = cloneRemember.checked;
 }
 
-/* ---------- Layout calc (table-only scroll) ---------- */
+/* ---------- Layout calc ---------- */
 function setHeights(){
   const topbar = document.getElementById("appTopbar");
   const h = topbar ? topbar.offsetHeight : 56;
@@ -163,13 +171,13 @@ window.addEventListener("orientationchange", setHeights);
 /* ---------- Rendering ---------- */
 function ensureVisibleState(){
   const hasRows=state.targets.length>0;
-  emptyGlobal.classList.toggle("d-none", hasRows);
-  tableWrap.classList.toggle("d-none", !hasRows);
+  if(emptyGlobal) emptyGlobal.classList.toggle("d-none", hasRows);
+  if(tableWrap) tableWrap.classList.toggle("d-none", !hasRows);
   const metaText = hasRows
     ? `${state.targets.length} target${state.targets.length!==1?'s':''} • last saved ${new Date().toLocaleTimeString()}`
     : `No data yet`;
-  boardMeta.textContent = metaText;
-  if (statusBarSaved) statusBarSaved.textContent = metaText;
+  if(boardMeta) boardMeta.textContent = metaText;
+  if(statusBarSaved) statusBarSaved.textContent = metaText;
 }
 function statusDisplay(s){
   const str=(s?.state||"").toLowerCase();
@@ -189,14 +197,15 @@ function formatLast(last){
 }
 function rowData(id){
   const r=state.results[id]||{};
-  return { id, name:r.name||"", level:r.level??"", st:statusDisplay(r.status||{}), last:formatLast(r.last_action) };
+  const avatar = (r.avatar && String(r.avatar).trim()) ? r.avatar : "assets/profile.png";
+  return { id, name:r.name||"", level:r.level??"", avatar, st:statusDisplay(r.status||{}), last:formatLast(r.last_action) };
 }
 function render(){
   ensureVisibleState();
-  const filter=statusFilterEl.value;
-  const term=(searchBoxEl.value||"").trim().toLowerCase();
+  const filter=statusFilterEl?.value || "all";
+  const term=(searchBoxEl?.value||"").trim().toLowerCase();
 
-  grid.querySelectorAll("th.sortable").forEach(th=>{
+  grid?.querySelectorAll("th.sortable").forEach(th=>{
     th.classList.remove("sort-asc","sort-desc");
     if(th.dataset.sort===state.sort.key){
       th.classList.add(state.sort.dir>0?"sort-asc":"sort-desc");
@@ -205,26 +214,29 @@ function render(){
 
   const frag=document.createDocumentFragment(); let visible=0;
   for(const id of sortedTargets()){
-    const {name,level,st,last}=rowData(id);
+    const {name,level,st,last,avatar}=rowData(id);
     if(filter!=="all" && st.label.toLowerCase()!==filter.toLowerCase()) continue;
     if(term){
       const hay=(id+" "+(name||"")).toLowerCase();
       if(!hay.includes(term)) continue;
     }
+    const avatarHtml = `<img class="avatar" src="${escapeHtml(avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='assets/profile.png';">`;
     const tr=document.createElement("tr");
     tr.dataset.id=id;
     tr.innerHTML=`
       <td><input type="checkbox" class="rowchk" /></td>
-      <td class="font-monospace">${id}</td>
-      <td>${escapeHtml(name)}</td>
-      <td>${escapeHtml(level)}</td>
-      <td><span class="badge rounded-pill ${st.badge} border">${escapeHtml(st.label)}</span></td>
-      <td>${escapeHtml(last)}</td>
+      <td class="font-monospace cell-id" data-label="ID">#${id}</td>
+      <td class="cell-name" data-label="Name">
+        <span class="name-wrap">${avatarHtml}<span class="name-text">${escapeHtml(name||"")}</span></span>
+      </td>
+      <td class="cell-level" data-label="Level"><span class="lvl-pill">Lv ${escapeHtml(level)}</span></td>
+      <td class="cell-status" data-label="Status"><span class="badge rounded-pill ${st.badge} border">${escapeHtml(st.label)}</span></td>
+      <td class="cell-last" data-label="Last action"><i class="bi bi-clock-history"></i><span>${escapeHtml(last)}</span></td>
     `;
     frag.appendChild(tr); visible++;
   }
-  tbody.innerHTML=""; tbody.appendChild(frag);
-  tableEmpty.classList.toggle("d-none", !(state.targets.length>0 && visible===0));
+  if(tbody){ tbody.innerHTML=""; tbody.appendChild(frag); }
+  if(tableEmpty) tableEmpty.classList.toggle("d-none", !(state.targets.length>0 && visible===0));
   updateChipCounts(); persist();
 }
 function sortedTargets(){
@@ -249,27 +261,28 @@ function updateChipCounts(){
 }
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,(m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 
-/* Sorting */
-grid.querySelectorAll("th.sortable").forEach(th=>{
+/* Sorting (desktop header) */
+grid?.querySelectorAll("th.sortable").forEach(th=>{
   th.addEventListener("click",()=>{
     const key=th.dataset.sort;
     state.sort = (state.sort.key===key) ? {key, dir:state.sort.dir*-1} : {key, dir:1};
+    updateMobileSortLabel();
     render();
   });
 });
 
 /* Selection + row click */
 chkAll?.addEventListener("change",()=>{
-  tbody.querySelectorAll(".rowchk").forEach(cb=>cb.checked=chkAll.checked);
+  tbody?.querySelectorAll(".rowchk").forEach(cb=>cb.checked=chkAll.checked);
 });
-tbody.addEventListener("change",(e)=>{
+tbody?.addEventListener("change",(e)=>{
   if(!(e.target instanceof HTMLInputElement)) return;
   if(e.target.classList.contains("rowchk")){
     const boxes=[...tbody.querySelectorAll(".rowchk")];
     chkAll.checked = boxes.length>0 && boxes.every(b=>b.checked);
   }
 });
-tbody.addEventListener("click",(e)=>{
+tbody?.addEventListener("click",(e)=>{
   if(e.target.closest("input,button,a,label")) return;
   const tr=e.target.closest("tr"); if(!tr) return;
   const id=tr.dataset.id; if(!id) return;
@@ -277,20 +290,20 @@ tbody.addEventListener("click",(e)=>{
 });
 
 /* Filters */
-statusFilterEl.addEventListener("change",()=>{
+statusFilterEl?.addEventListener("change",()=>{
   chipsWrap.querySelectorAll(".chip").forEach(c=>c.classList.toggle("active", c.dataset.val===statusFilterEl.value || (statusFilterEl.value==="all" && c.dataset.val==="all")));
   render();
 });
-chipsWrap.addEventListener("click",(e)=>{
+chipsWrap?.addEventListener("click",(e)=>{
   const btn=e.target.closest(".chip"); if(!btn) return;
   chipsWrap.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
   btn.classList.add("active");
-  statusFilterEl.value=btn.dataset.val || "all";
+  if(statusFilterEl) statusFilterEl.value=btn.dataset.val || "all";
   render();
 });
-searchBoxEl.addEventListener("input",()=>render());
+searchBoxEl?.addEventListener("input",()=>render());
 
-/* --- Sidebar actions for desktop + mobile clone (event delegation) --- */
+/* --- Sidebar & actions --- */
 document.addEventListener("click",(e)=>{
   const act = e.target.closest("[data-action]")?.dataset.action;
   if(!act) return;
@@ -306,12 +319,9 @@ document.addEventListener("click",(e)=>{
     openAddDialog("bulk", true);
   }
 });
-
-/* Keep direct hooks for desktop IDs */
 btnAddDialog?.addEventListener("click",()=>openAddDialog("single", true));
 btnBulk?.addEventListener("click",()=>openAddDialog("bulk", true));
-
-ctaAdd.addEventListener("click",()=>openAddDialog("single", false));
+ctaAdd?.addEventListener("click",()=>openAddDialog("single", false));
 
 function closeOffcanvasIfOpen(){
   if(!offcanvasEl) return;
@@ -320,25 +330,28 @@ function closeOffcanvasIfOpen(){
 }
 function openAddDialog(tab="single", fromSidebar=false){
   if(fromSidebar) closeOffcanvasIfOpen();
-  if(addDlgEl.classList.contains("show")) return;
+  const el = $("#addDlg");
+  if(el?.classList.contains("show")) return;
 
   new bootstrap.Tab(document.querySelector(`[data-bs-target="#${tab==="single"?"singleTab":"bulkTab"}"]`)).show();
-  singleInput.value=""; singleHint.textContent="Waiting for input…";
-  bulkText.value=""; bulkHint.textContent="0 valid IDs detected.";
-  addDlg.show();
+  if(singleInput) singleInput.value="";
+  if(singleHint) singleHint.textContent="Waiting for input…";
+  if(bulkText) bulkText.value="";
+  if(bulkHint) bulkHint.textContent="0 valid IDs detected.";
+  modalShow("#addDlg");
 }
 
-singleInput.addEventListener("input",()=>{
+singleInput?.addEventListener("input",()=>{
   const ids=extractIds(singleInput.value);
-  singleHint.textContent = ids.length ? `Resolved → ${ids.join(", ")}` : `No valid ID found yet. Paste an ID or Torn profile URL.`;
+  if(singleHint) singleHint.textContent = ids.length ? `Resolved → ${ids.join(", ")}` : `No valid ID found yet. Paste an ID or Torn profile URL.`;
 });
-bulkText.addEventListener("input",()=>{
+bulkText?.addEventListener("input",()=>{
   const ids=extractIds(bulkText.value);
-  bulkHint.textContent = `${ids.length} valid ID${ids.length!==1?'s':''} detected.`;
+  if(bulkHint) bulkHint.textContent = `${ids.length} valid ID${ids.length!==1?'s':''} detected.`;
 });
-addConfirm.addEventListener("click",async ()=>{
+addConfirm?.addEventListener("click",async ()=>{
   const activeTab=document.querySelector("#addTabs .nav-link.active")?.getAttribute("data-bs-target")||"#singleTab";
-  const source = activeTab==="#singleTab" ? singleInput.value : bulkText.value;
+  const source = activeTab==="#singleTab" ? (singleInput?.value||"") : (bulkText?.value||"");
   let ids = extractIds(source);
   if(activeTab==="#singleTab" && !ids.length && state.apiKey && source.trim()){
     addConfirm.disabled=true; addConfirm.textContent="Resolving…";
@@ -346,21 +359,19 @@ addConfirm.addEventListener("click",async ()=>{
     addConfirm.disabled=false; addConfirm.textContent="Add";
     if(id) ids=[id];
   }
-  if(!ids.length){ singleHint.textContent="No valid IDs found. Try a different input."; return; }
+  if(!ids.length){ if(singleHint) singleHint.textContent="No valid IDs found. Try a different input."; return; }
   let added=0; for(const id of ids){ if(!state.targets.includes(id)){ state.targets.push(id); added++; } }
-  sortTargets(); render(); addDlg.hide();
+  sortTargets(); render(); modalHide("#addDlg");
   setStatus("Targets updated.", false);
 
   if(!state.apiKey){ showApiKeyInfo(); } else { startFetchAll(); }
 });
 
-/* Bulk (legacy textarea) */
-const bulkTextLegacy=$("#bulkTextLegacy");
-const bulkConfirmLegacy=$("#bulkConfirmLegacy");
+/* Bulk (legacy) */
 bulkConfirmLegacy?.addEventListener("click",()=>{
   const ids=extractIds(bulkTextLegacy.value);
   let added=0; for(const id of ids){ if(!state.targets.includes(id)){ state.targets.push(id); added++; } }
-  bulkTextLegacy.value=""; new bootstrap.Modal($("#bulkDlg")).hide?.();
+  bulkTextLegacy.value=""; modalHide("#bulkDlg");
   if(!added) alert("No new IDs found.");
   sortTargets(); render();
   setStatus("Targets updated.", false);
@@ -379,14 +390,14 @@ btnRemove?.addEventListener("click",()=>{
 btnClear?.addEventListener("click",()=>{ if(confirm("Clear all targets?")){ state.targets=[]; state.results={}; render(); setStatus("Cleared target list.", false);} });
 
 /* Open/Save file */
-btnOpen.addEventListener("click",()=>$("#file").click());
-ctaOpen.addEventListener("click",()=>$("#file").click());
-$("#file").addEventListener("change",async(e)=>{
+btnOpen?.addEventListener("click",()=>$("#file").click());
+ctaOpen?.addEventListener("click",()=>$("#file").click());
+$("#file")?.addEventListener("change",async(e)=>{
   const f=e.target.files?.[0]; if(!f) return;
   try{ importFromJSON(await f.text()); setStatus("List loaded from file.", false); }catch{ alert("Could not read file."); }
   finally{ e.target.value=""; }
 });
-btnSave.addEventListener("click",()=>{
+btnSave?.addEventListener("click",()=>{
   const payload={app:"Torn Targets",version:APP_VERSION,exportedAt:new Date().toISOString(),targets:state.targets};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
@@ -407,22 +418,23 @@ function importFromJSON(text){
 }
 
 /* Fetching */
-btnFetch.addEventListener("click",()=>{
-  // If the user typed the key in the offcanvas, mirror it first.
+btnFetch?.addEventListener("click",()=>{
   readFromOffcanvasIfPresent();
   if(!apiKeyPresent()) { showApiKeyInfo(); return; }
   startFetchAll();
 });
-btnStop.addEventListener("click",()=>{ state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); });
-btnResetCols.addEventListener("click",()=>{ /* future column prefs */ });
+btnStop?.addEventListener("click",()=>{ state.stop=true; setStatus("Stopped by user.", false); modalHide("#fetchDlg"); });
+$("#fetchCancel")?.addEventListener("click", ()=>{ state.stop=true; setStatus("Stopped by user.", false); modalHide("#fetchDlg"); });
+
+btnResetCols?.addEventListener("click",()=>{ /* future column prefs */ });
 
 function apiKeyPresent(){
-  saveKeyMaybe();
+  persistKeyToStorage();
   return !!state.apiKey;
 }
 
 async function startFetchAll(){
-  saveKeyMaybe();
+  persistKeyToStorage();
   if(!state.apiKey) return;
   if(!state.targets.length) return alert("No targets to fetch.");
 
@@ -441,7 +453,7 @@ async function startFetchAll(){
       await sleep(state.settings.throttleMs);
     }
   };
-  const n=Math.max(1, Math.min(4, parseInt(concurrencyEl.value,10)||2));
+  const n=Math.max(1, Math.min(4, parseInt(concurrencyEl?.value,10)||2));
   await Promise.all([...Array(n)].map(()=>worker()));
 
   showLoading(false);
@@ -449,26 +461,27 @@ async function startFetchAll(){
   setStatus("Fetch complete.", false);
 }
 function showLoading(flag){
-  progressWrap.classList.toggle("d-none", !flag);
-  btnFetch.disabled=flag; btnStop.disabled=!flag;
+  if(progressWrap) progressWrap.classList.toggle("d-none", !flag);
+  if(btnFetch) btnFetch.disabled=flag;
+  if(btnStop) btnStop.disabled=!flag;
 
   if(flag){
     updateRing(0);
-    ringPct.textContent="0%";
-    ringSub.textContent="Fetching…";
-    fetchDlg.show();
+    if(ringPct) ringPct.textContent="0%";
+    if(ringSub) ringSub.textContent="Fetching…";
+    modalShow("#fetchDlg");
   }else{
-    fetchDlg.hide();
+    modalHide("#fetchDlg");
   }
-  loadingOverlay.classList.add("d-none");
+  loadingOverlay?.classList.add("d-none");
 }
 function setProgress(pct, done=0, total=0){
   const p = Math.max(0, Math.min(100, Math.round(pct)));
-  progressBar.style.width=`${p}%`;
-  progressText.textContent=`${p}%`;
+  if(progressBar) progressBar.style.width=`${p}%`;
+  if(progressText) progressText.textContent=`${p}%`;
   updateRing(p);
-  ringPct.textContent = `${p}%`;
-  if(total){ ringSub.textContent = `${done} / ${total}`; }
+  if(ringPct) ringPct.textContent = `${p}%`;
+  if(total && ringSub){ ringSub.textContent = `${done} / ${total}`; }
 }
 function updateRing(p){
   if(!ringFg) return;
@@ -487,24 +500,36 @@ async function fetchOne(id){
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data=await res.json();
     if(data?.error){
-      state.results[id]={ name:"", level:"", status:{state:`Error ${data.error.error}`}, last_action:{} };
+      state.results[id]={ name:"", level:"", avatar:"", status:{state:`Error ${data.error.error}`}, last_action:{} };
     }else{
-      state.results[id]={ name:data.name, level:data.level, status:data.status, last_action:data.last_action };
+      state.results[id]={
+        name:data.name,
+        level:data.level,
+        avatar: data.profile_image || "",
+        status:data.status,
+        last_action:data.last_action
+      };
     }
     renderRow(id);
   }catch(e){
     console.error("Fetch failed",id,e);
-    state.results[id]={ name:"", level:"", status:{state:"Offline"}, last_action:{} };
+    state.results[id]={ name:"", level:"", avatar:"", status:{state:"Offline"}, last_action:{} };
     renderRow(id);
   }
 }
 function renderRow(id){
-  const tr=tbody.querySelector(`tr[data-id="${CSS.escape(id)}"]`); if(!tr) return;
+  const tr=tbody?.querySelector(`tr[data-id="${CSS.escape(id)}"]`); if(!tr) return;
   const r=rowData(id); const tds=tr.children;
-  tds[2].innerHTML=escapeHtml(r.name);
-  tds[3].innerHTML=escapeHtml(r.level);
+  const nameCell = tds[2].querySelector(".name-text");
+  const avatarImg = tds[2].querySelector(".avatar");
+  if(nameCell) nameCell.textContent = r.name || "";
+  if(avatarImg){
+    avatarImg.src = r.avatar || "assets/profile.png";
+    avatarImg.onerror = function(){ this.onerror=null; this.src="assets/profile.png"; };
+  }
+  tds[3].innerHTML=`<span class="lvl-pill">Lv ${escapeHtml(r.level)}</span>`;
   tds[4].innerHTML=`<span class="badge rounded-pill ${r.st.badge} border">${escapeHtml(r.st.label)}</span>`;
-  tds[5].innerHTML=escapeHtml(r.last);
+  tds[5].innerHTML=`<i class="bi bi-clock-history"></i><span>${escapeHtml(r.last)}</span>`;
   updateChipCounts(); persist();
 }
 function sortTargets(){ state.targets = sortedTargets(); }
@@ -526,18 +551,21 @@ async function resolveNameToId(name){
 }
 
 /* Settings */
-concurrencyEl.addEventListener("change",()=>{
+concurrencyEl?.addEventListener("change",()=>{
   const v=parseInt(concurrencyEl.value,10);
   state.settings.concurrency=Math.max(1,Math.min(4,isFinite(v)?v:2)); persist();
 });
-throttleEl.addEventListener("change",()=>{
+throttleEl?.addEventListener("change",()=>{
   const v=parseInt(throttleEl.value,10);
   state.settings.throttleMs=Math.max(300,isFinite(v)?v:1500); persist();
 });
-useProxyEl.addEventListener("change",()=>{ state.settings.useProxy=useProxyEl.checked; persist(); });
-proxyUrlEl.addEventListener("change",()=>{ state.settings.proxyUrl=proxyUrlEl.value.trim(); persist(); });
-apiKeyEl.addEventListener("change",saveKeyMaybe);
-rememberKeyEl.addEventListener("change",saveKeyMaybe);
+useProxyEl?.addEventListener("change",()=>{ state.settings.useProxy=useProxyEl.checked; persist(); });
+proxyUrlEl?.addEventListener("change",()=>{ state.settings.proxyUrl=proxyUrlEl.value.trim(); persist(); });
+
+/* Persist API key */
+apiKeyEl?.addEventListener("input", persistKeyToStorage);
+apiKeyEl?.addEventListener("change", persistKeyToStorage);
+rememberKeyEl?.addEventListener("change", persistKeyToStorage);
 
 /* Offcanvas clone (mobile) */
 offcanvasEl?.addEventListener("show.bs.offcanvas", ()=>{
@@ -548,42 +576,47 @@ offcanvasEl?.addEventListener("show.bs.offcanvas", ()=>{
   const frag = document.createDocumentFragment();
   src.querySelectorAll(".card.glass").forEach(card=>{
     const clone = card.cloneNode(true);
-    // remove only IDs; keep data-bind so we can mirror values
     clone.querySelectorAll("[id]").forEach(n=>n.removeAttribute("id"));
     frag.appendChild(clone);
   });
   dest.appendChild(frag);
 
-  // Prefill the cloned inputs with the real values
+  // Bind values into clone
   const cloneApi = dest.querySelector('[data-bind="apiKey"]');
   const cloneRemember = dest.querySelector('[data-bind="rememberKey"]');
-  if(cloneApi) cloneApi.value = apiKeyEl.value;
-  if(cloneRemember) cloneRemember.checked = rememberKeyEl.checked;
+  if(cloneApi && apiKeyEl) cloneApi.value = apiKeyEl.value;
+  if(cloneRemember && rememberKeyEl) cloneRemember.checked = rememberKeyEl.checked;
 
-  // Live sync from the clone back to real fields so actions work even without pressing Save
   dest.addEventListener("input",(ev)=>{
-    if(ev.target.matches('[data-bind="apiKey"]')) apiKeyEl.value = ev.target.value;
+    if(ev.target.matches('[data-bind="apiKey"]') && apiKeyEl){
+      apiKeyEl.value = ev.target.value;
+      persistKeyToStorage();
+    }
   });
   dest.addEventListener("change",(ev)=>{
-    if(ev.target.matches('[data-bind="rememberKey"]')) rememberKeyEl.checked = ev.target.checked;
+    if(ev.target.matches('[data-bind="rememberKey"]') && rememberKeyEl){
+      rememberKeyEl.checked = ev.target.checked;
+      persistKeyToStorage();
+    }
   }, { once:false });
 });
 
 /* About modal */
 btnAbout?.addEventListener("click", async ()=>{
-  aboutVersion.textContent = APP_VERSION;
-  aboutThemeLabel.textContent = `Theme: ${localStorage.getItem("theme") || "dark"}`;
+  $("#aboutVersion").textContent = APP_VERSION;
+  $("#aboutThemeLabel").textContent = `Theme: ${localStorage.getItem("theme") || "dark"}`;
   await ensureAboutAvatar();
-  aboutDlg.show();
+  modalShow("#aboutDlg");
 });
-copyIdBtn?.addEventListener("click", async ()=>{
+$("#copyIdBtn")?.addEventListener("click", async ()=>{
   try{
     await navigator.clipboard.writeText(ABOUT_TORN_ID);
-    copyIdBtn.innerHTML = '<i class="bi bi-clipboard-check me-1"></i> Copied!';
-    setTimeout(()=>copyIdBtn.innerHTML='<i class="bi bi-clipboard me-1"></i> Copy profile ID',1200);
+    $("#copyIdBtn").innerHTML = '<i class="bi bi-clipboard-check me-1"></i> Copied!';
+    setTimeout(()=>$("#copyIdBtn").innerHTML='<i class="bi bi-clipboard me-1"></i> Copy profile ID',1200);
   }catch{}
 });
 async function ensureAboutAvatar(){
+  const aboutAvatar = $("#aboutAvatar");
   if(!aboutAvatar || aboutAvatar.dataset.loaded === "1") return;
   let url = "";
   const key = state.apiKey || localStorage.getItem(KEY_KEY) || "";
@@ -601,28 +634,155 @@ async function ensureAboutAvatar(){
   aboutAvatar.dataset.loaded = "1";
 }
 
-/* API key helpers */
-function showApiKeyInfo(){ keyInfoDlg.show(); }
-keyFocusBtn?.addEventListener("click", ()=>{
-  keyInfoDlg.hide();
-  // Open the offcanvas on small screens for convenience
-  if(window.innerWidth < 992){
-    const inst = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
-    inst.show();
+/* API key info dialog */
+function showApiKeyInfo(){ modalShow("#apiKeyInfoDlg"); }
+$("#keyFocusBtn")?.addEventListener("click", ()=>{
+  modalHide("#apiKeyInfoDlg");
+  if(window.innerWidth < 992 && offcanvasEl){
+    bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl).show();
   }
   setTimeout(()=>{
     document.querySelector('[data-bind="apiKey"]')?.focus();
   }, 300);
 });
 function saveApiAndCloseSidebar(){
-  // If the user typed inside the offcanvas, mirror first
   readFromOffcanvasIfPresent();
-  saveKeyMaybe();
+  persistKeyToStorage();
   setStatus(state.apiKey ? "API key saved." : "API key cleared.", false);
-  closeOffcanvasIfOpen();
+  if(offcanvasEl){
+    const inst = bootstrap.Offcanvas.getInstance(offcanvasEl) || bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
+    if(offcanvasEl.classList.contains("show")) inst.hide();
+  }
 }
 
-/* Init */
+/* ---------- Mobile polish: global + card CSS + sort bar ---------- */
+function injectMobileStyles(){
+  if(document.getElementById("mobile-card-styles")) return;
+  const s = document.createElement("style");
+  s.id = "mobile-card-styles";
+  s.textContent = `
+/* Global fixes */
+.table-wrap{ border-radius: var(--radius); overflow: clip; clip-path: inset(0 round var(--radius)); }
+@supports not (overflow: clip){ .table-wrap{ overflow: hidden; } }
+
+/* Always constrain avatars */
+#grid .avatar{ width:26px; height:26px; border-radius:8px; object-fit:cover; border:1px solid var(--border); background:rgba(0,0,0,.15); }
+
+/* Mobile cards & interactions */
+@media (max-width: 768px){
+  .table-modern thead{ display:none !important; }
+
+  /* Sort bar lives OUTSIDE the scroll area now; spacing only */
+  #mobileSortBar{ margin: 6px 0 10px; }
+  #mobileSortBar .btn{ border-radius:12px; }
+
+  /* Kill row hover highlight on mobile completely */
+  .table-modern tbody tr:hover,
+  .table-modern tbody tr:hover td{ background: inherit !important; }
+  .table-modern tbody tr{ cursor: default; }
+
+  .table-responsive{ overflow: visible; }
+  #grid{ border-collapse: separate; border-spacing: 0 14px; }
+  #grid tbody td{ border-bottom:0 !important; padding:.35rem .4rem; }
+
+  #grid tbody tr{
+    display:grid;
+    grid-template-columns: 36px 1fr auto;
+    grid-template-areas:
+      "chk title status"
+      "chk meta1 status"
+      "chk meta2 status"
+      "chk foot  foot";
+    gap: 6px 12px;
+    background:
+      radial-gradient(450px 110px at 10% -60%, rgba(125,211,252,.10), transparent 70%),
+      var(--tbl-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 12px 12px 10px 8px;
+    box-shadow: 0 10px 24px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.05);
+  }
+
+  #grid tbody td:first-child{ grid-area: chk; align-self:start; padding-top:.35rem; }
+  #grid input[type="checkbox"]{ width:22px; height:22px; }
+
+  #grid .avatar{ width:42px; height:42px; border-radius:12px; }
+  .cell-name{ grid-area: title; font-size:1.05rem; font-weight:800; letter-spacing:.2px; }
+  .cell-name .name-wrap{ display:flex; align-items:center; gap:.6rem; }
+
+  .cell-status{ grid-area: status; justify-self:end; align-self:start; }
+  .cell-status .badge{ padding:.35rem .6rem; font-weight:800; letter-spacing:.15px; box-shadow: 0 4px 18px rgba(0,0,0,.25); }
+
+  .cell-id{ grid-area: meta1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--bs-secondary-color); }
+  .cell-level{ grid-area: meta2; }
+  .lvl-pill{ display:inline-block; padding:.18rem .5rem; border-radius:999px; border:1px solid var(--border); background: rgba(125,211,252,.06); font-weight:800; letter-spacing:.2px; }
+
+  .cell-last{ grid-area: foot; display:flex; align-items:center; gap:.45rem; color: var(--bs-secondary-color); margin-top:.2rem; }
+  .cell-last .bi{ opacity:.8; }
+}
+  `;
+  document.head.appendChild(s);
+}
+
+function insertMobileSortBar(){
+  if(document.getElementById("mobileSortBar")) return;
+
+  // Place BEFORE the scroll container so it never overlays cards
+  const gridScroll = document.getElementById("gridScroll");
+  if(!gridScroll || !gridScroll.parentElement) return;
+
+  const wrap = document.createElement("div");
+  wrap.id = "mobileSortBar";
+  wrap.className = "d-md-none";
+  wrap.innerHTML = `
+    <div class="d-flex gap-2">
+      <div class="dropdown flex-grow-1">
+        <button class="btn btn-ghost btn-sm w-100 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-arrow-down-up me-1"></i><span id="sortLabel">Sort: ID ↑</span>
+        </button>
+        <ul class="dropdown-menu w-100">
+          <li><button class="dropdown-item" data-sort="id">ID</button></li>
+          <li><button class="dropdown-item" data-sort="name">Name</button></li>
+          <li><button class="dropdown-item" data-sort="level">Level</button></li>
+          <li><button class="dropdown-item" data-sort="status">Status</button></li>
+          <li><button class="dropdown-item" data-sort="last">Last action</button></li>
+        </ul>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="toggleSortDir" aria-label="Toggle sort direction">
+        <i id="sortDirIcon" class="bi bi-sort-down"></i>
+      </button>
+    </div>
+  `;
+  gridScroll.parentElement.insertBefore(wrap, gridScroll);
+
+  wrap.querySelectorAll(".dropdown-item").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const key = btn.dataset.sort;
+      state.sort = { key, dir: 1 };
+      updateMobileSortLabel();
+      render();
+    });
+  });
+  $("#toggleSortDir").addEventListener("click", ()=>{
+    state.sort.dir *= -1;
+    updateMobileSortLabel();
+    render();
+  });
+  updateMobileSortLabel();
+}
+function updateMobileSortLabel(){
+  const label = document.getElementById("sortLabel");
+  const icon  = document.getElementById("sortDirIcon");
+  if(!label || !icon) return;
+  const dirArrow = state.sort.dir>0 ? "↑" : "↓";
+  label.textContent = `Sort: ${titleCase(state.sort.key)} ${dirArrow}`;
+  icon.className = state.sort.dir>0 ? "bi bi-sort-down" : "bi bi-sort-up";
+}
+function titleCase(s){ return String(s||"").replace(/\b\w/g, c=>c.toUpperCase()); }
+
+/* ---------- Init ---------- */
 initTheme();
 setHeights();
+injectMobileStyles();
+insertMobileSortBar();
 restore();

@@ -89,21 +89,18 @@
                 <div class="text-uppercase text-secondary fw-bold small mb-2">API</div>
                 <div class="mb-2">
                   <label class="form-label small">API key</label>
-                  <!-- data-bind attributes mirror to the offcanvas clone -->
-                  <input type="password" id="apiKey" data-bind="apiKey" class="form-control form-control-sm" placeholder="Paste your Torn API key" autocomplete="off">
+                  <input data-bind="apiKey" type="password" id="apiKey" class="form-control form-control-sm" placeholder="Paste your Torn API key" autocomplete="off">
                 </div>
                 <div class="form-check mb-2">
-                  <input class="form-check-input" type="checkbox" id="rememberKey" data-bind="rememberKey" checked>
+                  <input data-bind="rememberKey" class="form-check-input" type="checkbox" id="rememberKey" checked>
                   <label class="form-check-label small" for="rememberKey">Remember API key on this device</label>
                 </div>
-                <!-- Save API key -->
-                <div class="d-grid mt-2">
-                  <button class="btn btn-primary btn-sm" data-action="save-api">
-                    <i class="bi bi-key me-1"></i> Save API key
-                  </button>
-                </div>
 
-                <button class="btn btn-ghost btn-sm w-100 text-start collapsed mt-2" data-bs-toggle="collapse" data-bs-target="#advanced" aria-expanded="false">
+                <button class="btn btn-primary w-100 mb-2" data-action="save-api">
+                  <i class="bi bi-key me-1"></i> Save API key
+                </button>
+
+                <button class="btn btn-ghost btn-sm w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#advanced" aria-expanded="false">
                   <i class="bi bi-gear me-1"></i> Advanced
                 </button>
                 <div id="advanced" class="collapse mt-2">
@@ -215,7 +212,7 @@
         <!-- Board -->
         <section class="col-lg-9 col-xl-9 board-col">
           <!-- Board header -->
-          <div class="card glass mb-3 anim-in-up flex-shrink-0">
+          <div id="boardHeader" class="card glass mb-3 anim-in-up flex-shrink-0">
             <div class="card-body d-flex align-items-center justify-content-between">
               <div>
                 <div class="fw-semibold">Targets board</div>
@@ -264,8 +261,8 @@
                 </div>
 
                 <!-- Table -->
-                <div id="tableWrap" class="table-responsive table-wrap d-none">
-                  <div class="table-clip">
+                <div id="tableWrap" class="table-wrap d-none">
+                  <div class="table-clip table-responsive">
                     <table id="grid" class="table table-modern table-hover align-middle mb-0">
                       <thead class="table-header">
                         <tr>
@@ -279,11 +276,11 @@
                       </thead>
                       <tbody id="tbody"></tbody>
                     </table>
-                    <div id="tableEmpty" class="table-empty d-none">
-                      <div class="p-4 text-center">
-                        <div class="fw-semibold">No rows match your filters</div>
-                        <div class="text-secondary small">Try clearing search or choosing a different status.</div>
-                      </div>
+                  </div>
+                  <div id="tableEmpty" class="table-empty d-none">
+                    <div class="p-4 text-center">
+                      <div class="fw-semibold">No rows match your filters</div>
+                      <div class="text-secondary small">Try clearing search or choosing a different status.</div>
                     </div>
                   </div>
                 </div>
@@ -318,49 +315,95 @@
 
     <input id="file" type="file" accept=".json" hidden />
 
-    <!-- Add Target Modal -->
-    <div class="modal fade" id="addDlg" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered modal-lg">
+    <!-- Add Target Modal (improved) -->
+    <div class="modal fade" id="addDlg" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+      <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
         <div class="modal-content glass">
           <div class="modal-header">
-            <h5 class="modal-title">Add targets</h5>
+            <h5 class="modal-title d-flex align-items-center gap-2 m-0">
+              <i class="bi bi-list-check text-info"></i>
+              Add targets
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
+
           <div class="modal-body">
+            <div class="alert alert-secondary small d-flex align-items-start gap-2 mb-3" role="alert">
+              <i class="bi bi-lightbulb"></i>
+              <div>
+                Paste an <strong>ID</strong>, a <strong>username</strong>, or a full
+                <code>torn.com/profiles.php?XID=…</code> URL. Usernames are resolved to IDs when a
+                <strong>Limited Access</strong> API key is present. Everything happens locally.
+              </div>
+            </div>
+
             <ul class="nav nav-tabs" id="addTabs" role="tablist">
               <li class="nav-item" role="presentation">
-                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#singleTab" type="button" role="tab">Single</button>
+                <button class="nav-link active" id="single-tab" data-bs-toggle="tab" data-bs-target="#singleTab" type="button" role="tab" aria-controls="singleTab" aria-selected="true">
+                  <i class="bi bi-person-plus me-1"></i> Single
+                </button>
               </li>
               <li class="nav-item" role="presentation">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#bulkTab" type="button" role="tab">Bulk</button>
+                <button class="nav-link" id="bulk-tab" data-bs-toggle="tab" data-bs-target="#bulkTab" type="button" role="tab" aria-controls="bulkTab" aria-selected="false">
+                  <i class="bi bi-card-list me-1"></i> Bulk
+                </button>
               </li>
             </ul>
+
             <div class="tab-content pt-3">
-              <div class="tab-pane fade show active" id="singleTab" role="tabpanel">
-                <div class="mb-2">
-                  <label class="form-label small">Input</label>
-                  <input type="text" id="singleInput" class="form-control" placeholder="ID, username, or https://www.torn.com/profiles.php?XID=1234567">
+              <!-- Single -->
+              <div class="tab-pane fade show active" id="singleTab" role="tabpanel" aria-labelledby="single-tab">
+                <label class="form-label small fw-bold">ID / Username / Profile URL</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
+                  <input
+                    type="text"
+                    id="singleInput"
+                    class="form-control"
+                    placeholder="e.g. 1234567  •  AJ_Daddy  •  https://www.torn.com/profiles.php?XID=1234567"
+                    autocomplete="off"
+                  />
                 </div>
-                <div id="singleHint" class="text-secondary small">Waiting for input…</div>
+                <div id="singleHint" class="form-text text-secondary mt-2">Waiting for input…</div>
+                <div class="small text-secondary mt-2">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Username → ID resolution requires a <strong>Limited Access</strong> API key.
+                </div>
               </div>
-              <div class="tab-pane fade" id="bulkTab" role="tabpanel">
-                <div class="mb-2">
-                  <label class="form-label small">Paste many (one per line or mixed text)</label>
-                  <textarea id="bulkText" rows="8" class="form-control" placeholder="1234567
-https://www.torn.com/profiles.php?XID=7654321
-Name [998877]"></textarea>
-                </div>
-                <div id="bulkHint" class="text-secondary small">0 valid IDs detected.</div>
+
+              <!-- Bulk -->
+              <div class="tab-pane fade" id="bulkTab" role="tabpanel" aria-labelledby="bulk-tab">
+                <label class="form-label small fw-bold">Paste many (any format)</label>
+                <textarea
+                  id="bulkText"
+                  rows="8"
+                  class="form-control"
+                  placeholder="1234567
+    https://www.torn.com/profiles.php?XID=7654321
+    Name [998877]"
+                ></textarea>
+                <div id="bulkHint" class="form-text text-secondary mt-2">0 valid IDs detected.</div>
+                <ul class="small text-secondary mt-2 mb-0 ps-3">
+                  <li>One per line or mixed text is fine — IDs like <code>XID=123</code>, <code>[123]</code>, or plain numbers are detected.</li>
+                  <li>No uploads — parsing and validation are done on your device.</li>
+                </ul>
               </div>
             </div>
           </div>
+
           <div class="modal-footer">
+            <div class="small text-secondary d-none d-sm-flex align-items-center gap-2 me-auto">
+              <i class="bi bi-shield-lock"></i> Local-first: keys & lists never leave your device.
+            </div>
             <button class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
-            <button id="addConfirm" class="btn btn-primary">Add</button>
+            <button id="addConfirm" class="btn btn-primary">
+              <i class="bi bi-plus-lg me-1"></i> Add
+            </button>
           </div>
         </div>
       </div>
     </div>
+
 
     <!-- Legacy Bulk Modal -->
     <div class="modal fade" id="bulkDlg" tabindex="-1" aria-hidden="true">
@@ -382,16 +425,25 @@ Name [998877]"></textarea>
       </div>
     </div>
 
-    <!-- Fetch (progress) Modal — SVG ring -->
+    <!-- Fetch (progress) Modal — SVG ring with filter glow -->
     <div class="modal fade" id="fetchDlg" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass">
-          <div class="modal-body py-4 text-center">
+          <div class="modal-body py-4 text-center" style="overflow:visible">
             <div class="ring-wrap mx-auto mb-3">
-              <div class="ring-halo"></div>
               <svg class="ring-svg" viewBox="0 0 120 120" aria-hidden="true">
-                <circle class="ring-bg" cx="60" cy="60" r="52"/>
-                <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52" pathLength="100"/>
+                <defs>
+                  <!-- padded glow to avoid any clipping/boxes -->
+                  <filter id="ringGlow" x="-40%" y="-40%" width="180%" height="180%" filterUnits="objectBoundingBox">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur"/>
+                    <feMerge>
+                      <feMergeNode in="blur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+                <circle class="ring-bg" cx="60" cy="60" r="52"></circle>
+                <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52" pathLength="100" filter="url(#ringGlow)"></circle>
               </svg>
               <div class="ring-label">
                 <div id="ringPct" class="h4 mb-0">0%</div>
@@ -407,10 +459,38 @@ Name [998877]"></textarea>
       </div>
     </div>
 
+    <!-- API Key info modal -->
+    <div class="modal fade keymodal" id="apiKeyInfoDlg" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass">
+          <div class="keymodal-hero">
+            <div class="keymodal-icon"><i class="bi bi-key-fill"></i></div>
+            <div>
+              <h5 class="mb-0">API key required</h5>
+              <div class="text-secondary small">Use a <strong>Limited Access</strong> key to fetch names, levels &amp; live status.</div>
+            </div>
+          </div>
+          <div class="modal-body pt-0">
+            <div class="keymodal-note p-3 mb-3">
+              <div class="small mb-1 fw-semibold">How to get it</div>
+              <ol class="small mb-0 ps-3">
+                <li>Open <em>Profile → Settings → API Key</em> on Torn.</li>
+                <li>Create a key with <em>Limited Access</em> scope.</li>
+                <li>Paste it in the sidebar and press <em>Save API key</em>.</li>
+              </ol>
+            </div>
+            <div class="d-grid">
+              <button id="keyFocusBtn" class="btn btn-primary"><i class="bi bi-arrow-right-circle me-1"></i> Go to API key field</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- About Modal -->
     <div class="modal fade" id="aboutDlg" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content glass about-modal">
+        <div class="modal-content glass">
           <div class="about-hero text-center p-4">
             <img id="aboutAvatar" class="avatar-xl shadow-sm" src="" alt="Skillerious avatar" />
             <h5 class="mt-3 mb-1">Torn Targets</h5>
@@ -461,57 +541,6 @@ Name [998877]"></textarea>
           <div class="modal-footer justify-content-between">
             <span class="text-secondary small">v<span id="aboutVersion">—</span> • <span id="aboutThemeLabel">Theme: —</span></span>
             <button class="btn btn-primary" data-bs-dismiss="modal">Close</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- API Key Required Modal -->
-    <div class="modal fade" id="apiKeyInfoDlg" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content glass keymodal">
-          <div class="keymodal-hero">
-            <div class="keymodal-icon">
-              <i class="bi bi-key-fill"></i>
-            </div>
-            <div>
-              <h5 class="mb-1">Limited Access key required</h5>
-              <div class="text-secondary">We need a Torn API key to fetch names, levels, live status, and last actions.</div>
-            </div>
-          </div>
-          <div class="modal-body pt-0">
-            <div class="row g-3">
-              <div class="col-md-7">
-                <ul class="small mb-3 ps-3">
-                  <li>Use a <strong>Limited Access</strong> user key (safe &amp; recommended).</li>
-                  <li>Scopes used: <code>basic</code>, <code>profile</code>.</li>
-                  <li>Your key is stored locally only on this device.</li>
-                </ul>
-                <div class="d-flex gap-2 flex-wrap">
-                  <a class="btn btn-ghost" href="https://www.torn.com/preferences.php?tab=api" target="_blank" rel="noopener">
-                    <i class="bi bi-box-arrow-up-right me-1"></i> Open Torn API page
-                  </a>
-                  <button id="keyFocusBtn" class="btn btn-primary">
-                    <i class="bi bi-clipboard-check me-1"></i> I’ll add my key
-                  </button>
-                </div>
-              </div>
-              <div class="col-md-5">
-                <div class="glass p-3 keymodal-note">
-                  <div class="d-flex align-items-center gap-2 mb-2">
-                    <i class="bi bi-shield-lock"></i>
-                    <div class="fw-semibold">Privacy</div>
-                  </div>
-                  <div class="small text-secondary">
-                    This app runs entirely in your browser. No servers, no tracking. Your API key never leaves your device.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer justify-content-between">
-            <span class="text-secondary small">Tip: keep “Remember API key” checked for convenience.</span>
-            <button class="btn btn-ghost" data-bs-dismiss="modal">Close</button>
           </div>
         </div>
       </div>
