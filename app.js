@@ -1,4 +1,4 @@
-/* Torn Targets UI — table + mobile cards + crisp fetch ring + mobile actions */
+/* Torn Targets UI — table + mobile cards + brilliant fetch dialog + mobile actions */
 const APP_VERSION = "2.5.0";
 const STORE_KEY = "tornTargets.data.v2";
 const KEY_KEY   = "tornTargets.apiKey.v1";
@@ -51,14 +51,6 @@ const addConfirm=$("#addConfirm");
 const bulkDlg = new bootstrap.Modal($("#bulkDlg"));
 const bulkTextLegacy=$("#bulkTextLegacy");
 const bulkConfirmLegacy=$("#bulkConfirmLegacy");
-
-/* Fetch modal */
-const fetchDlgEl = $("#fetchDlg");
-const fetchDlg   = new bootstrap.Modal(fetchDlgEl);
-const ringFg     = $("#ringFg");
-const ringPct    = $("#ringPct");
-const ringSub    = $("#ringSub");
-$("#fetchCancel")?.addEventListener("click", ()=>{ state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); });
 
 /* API info modal */
 const apiKeyInfoDlg = new bootstrap.Modal($("#apiKeyInfoDlg"));
@@ -321,19 +313,25 @@ function render(){
 
 /* chip counts for sidebar filter */
 function updateChipCounts(){
-  const c={all:state.targets.length, ok:0,hosp:0,jail:0,travel:0,off:0};
-  for(const id of state.targets){
-    const cls=rowData(id).st.label.toLowerCase();
-    if(cls.includes("okay")) c.ok++; else if(cls.includes("hospital")) c.hosp++;
-    else if(cls.includes("jail")) c.jail++; else if(cls.includes("abroad")) c.travel++; else c.off++;
+  const c = { all: state.targets.length, ok: 0, hosp: 0, jail: 0, travel: 0, off: 0 };
+
+  for (const id of state.targets){
+    const cls = rowData(id).st.label.toLowerCase();
+    if (cls.includes("okay")) c.ok++;
+    else if (cls.includes("hospital")) c.hosp++;
+    else if (cls.includes("jail")) c.jail++;
+    else if (cls.includes("abroad")) c.travel++;
+    else c.off++;
   }
-  const allEl = $("#c-all"); if(allEl) allEl.textContent = c.all;
-  const okEl = $("#c-ok"); if(okEl) okEl.textContent = c.ok;
-  const hospEl = $("#c-hosp"); if(hospEl) hospEl.textContent = c.hosp;
-  const jailEl = $("#c-jail"); if(jailEl) jailEl.textContent = c.jail;
-  const travEl = $("#c-travel"); if(travEl) travEl.textContent = c.travel;
-  const offEl = $("#c-off"); if(offEl) offEl.textContent = c.off;
+
+  const allEl  = $("#c-all");    if (allEl)  allEl.textContent  = c.all;
+  const okEl   = $("#c-ok");     if (okEl)   okEl.textContent   = c.ok;
+  const hospEl = $("#c-hosp");   if (hospEl) hospEl.textContent = c.hosp;   // ← fixed
+  const jailEl = $("#c-jail");   if (jailEl) jailEl.textContent = c.jail;
+  const travEl = $("#c-travel"); if (travEl) travEl.textContent = c.travel;
+  const offEl  = $("#c-off");    if (offEl)  offEl.textContent  = c.off;
 }
+
 
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,(m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function escapeAttr(s){return String(s??"").replace(/"/g,"&quot;")}
@@ -470,9 +468,211 @@ function importFromJSON(text){
   }catch(e){ console.error(e); alert("Invalid targets JSON."); }
 }
 
-/* Fetching */
+/* ================== FETCH DIALOG (brilliant, smoothed) ================== */
+const fetchDlgEl = $("#fetchDlg");
+const fetchDlg   = new bootstrap.Modal(fetchDlgEl);
+const ringFg     = $("#ringFg");
+const ringPct    = $("#ringPct");
+const ringSub    = $("#ringSub");
+const ringIcon   = $("#ringIcon");
+const statDone   = $("#statDone");
+const statTotal  = $("#statTotal");
+const statRate   = $("#statRate");
+const statElapsed= $("#statElapsed");
+const statEta    = $("#statEta");
+
+// Smoothing + windowed rate controller
+const stats = {
+  windowSec: 12,        // rolling window size for rate (seconds)
+  alphaRate: 0.25,      // EMA smoothing for rate
+  alphaEta:  0.22,      // EMA smoothing for ETA
+  startMs: 0,
+  lastDone: 0,
+  times: [],            // completion timestamps (seconds)
+  rateEma: null,
+  etaEma: null
+};
+
+let fetchStartMs = 0;
+
+$("#fetchCancel")?.addEventListener("click", ()=>{
+  // graceful stopping
+  state.stop = true;
+  setStatus("Stopping…", false);
+  setFetchState("stopped");
+  if (ringSub) ringSub.textContent = "Stopping…";
+});
+btnStop ?.addEventListener("click",()=>{ 
+  state.stop=true; 
+  setStatus("Stopping…", false); 
+  setFetchState("stopped"); 
+  if (ringSub) ringSub.textContent="Stopping…"; 
+});
+
+/* Show/hide loading */
+function showLoading(flag){
+  progressWrap.classList.toggle("d-none", !flag);
+  if (btnFetch) btnFetch.disabled = flag;
+  if (btnStop)  btnStop.disabled  = !flag;
+
+  if(flag){
+    // reset UI
+    updateRing(0);
+    if (ringPct) ringPct.textContent="0%";
+    if (ringSub) ringSub.textContent="Preparing…";
+    if (ringIcon) ringIcon.classList.add("d-none");
+    setFetchState("fetching");
+    resetStats();
+
+    fetchStartMs = performance.now();
+    stats.startMs = fetchStartMs;
+    fetchDlg.show();
+  }else{
+    fetchDlg.hide();
+  }
+  loadingOverlay?.classList.add("d-none");
+}
+
+/* Progress + Stats */
+function setProgress(pct, done=0, total=0){
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  // header bar
+  progressBar.style.width=`${p}%`;
+  progressText.textContent=`${p}%`;
+  // ring
+  updateRing(p);
+  if (ringPct) ringPct.textContent = `${p}%`;
+  if (total){
+    if (ringSub) ringSub.textContent = `${done} / ${total}`;
+    updateStats(done, total);
+  }
+}
+
+/* Smooth ring update */
+function updateRing(p){
+  if(!ringFg) return;
+  const off = 100 - p;
+  ringFg.style.strokeDashoffset = String(off);
+}
+
+/* Stats helpers (smoothed) */
+function resetStats(){
+  stats.lastDone = 0;
+  stats.times.length = 0;
+  stats.rateEma = null;
+  stats.etaEma  = null;
+
+  if (statDone)    statDone.textContent = "0";
+  if (statTotal)   statTotal.textContent = "0";
+  if (statRate)    statRate.textContent = "0";
+  if (statElapsed) statElapsed.textContent = "0s";
+  if (statEta)     statEta.textContent = "—";
+}
+function ema(prev, value, alpha){
+  return prev == null ? value : (prev*(1-alpha) + value*alpha);
+}
+function updateStats(done, total){
+  const nowMs = performance.now();
+  const nowSec = nowMs / 1000;
+  const elapsedSec = Math.max(0.001, (nowMs - stats.startMs)/1000);
+
+  // Register newly completed items (handles concurrency bursts)
+  const delta = Math.max(0, done - stats.lastDone);
+  for (let i=0; i<delta; i++) stats.times.push(nowSec);
+
+  stats.lastDone = done;
+
+  // Keep only timestamps within the active window (window length ≤ elapsed)
+  const windowUsed = Math.min(stats.windowSec, Math.max(1, elapsedSec));
+  const cutoff = nowSec - windowUsed;
+  while (stats.times.length && stats.times[0] < cutoff) stats.times.shift();
+
+  // Windowed instantaneous rate (completions per second)
+  const winCount = stats.times.length;
+  const rateInstant = winCount / windowUsed;
+
+  // EMA-smoothed rate for display & ETA
+  stats.rateEma = ema(stats.rateEma, rateInstant, stats.alphaRate);
+
+  // Compute ETA from smoothed rate; fallback to global avg early on
+  const rateForEta =
+    (stats.rateEma && stats.rateEma > 0.0001) ? stats.rateEma :
+    (done > 0 ? (done / elapsedSec) : 0);
+
+  const remaining = Math.max(0, total - done);
+  const etaNew = rateForEta > 0 ? remaining / rateForEta : Infinity;
+
+  // EMA-smoothed ETA to avoid bouncing
+  if (isFinite(etaNew)) stats.etaEma = ema(stats.etaEma, etaNew, stats.alphaEta);
+
+  // Update UI (stable formatting)
+  if (statDone)    statDone.textContent = String(done);
+  if (statTotal)   statTotal.textContent = String(total);
+
+  // Rate
+  const rateShow = Math.max(0, rateForEta);
+  if (statRate)    statRate.textContent = rateShow < 10 ? rateShow.toFixed(1) : String(Math.round(rateShow));
+
+  // Elapsed
+  if (statElapsed) statElapsed.textContent = formatDuration(elapsedSec);
+
+  // ETA
+  if (remaining === 0){
+    if (statEta) statEta.textContent = "0s";
+  } else if (!isFinite(etaNew) || rateShow <= 0 || stats.etaEma == null) {
+    if (statEta) statEta.textContent = "—";
+  } else {
+    if (statEta) statEta.textContent = formatDuration(stats.etaEma);
+  }
+}
+function formatDuration(sec){
+  sec = Math.max(0, sec);
+  const m = Math.floor(sec/60);
+  const s = Math.round(sec%60);
+  return m ? `${m}:${String(s).padStart(2,"0")}` : `${s}s`;
+}
+
+/* Visual states: fetching | complete | stopped */
+function setFetchState(mode){
+  if(!fetchDlgEl) return;
+  const box = fetchDlgEl.querySelector(".fetch-modal");
+  box?.classList.remove("is-complete","is-stopped");
+  if(mode==="complete"){
+    box?.classList.add("is-complete");
+    if (ringIcon){
+      ringIcon.classList.remove("d-none");
+      ringIcon.innerHTML = '<i class="bi bi-check2-circle"></i>';
+    }
+  }else if(mode==="stopped"){
+    box?.classList.add("is-stopped");
+    if (ringIcon){
+      ringIcon.classList.remove("d-none");
+      ringIcon.innerHTML = '<i class="bi bi-stop-circle"></i>';
+    }
+  }else{
+    if (ringIcon) ringIcon.classList.add("d-none");
+  }
+}
+
+/* Finalize animation then close */
+async function finalizeFetchUI(mode){
+  if (mode==="complete"){
+    // sweep to 100 if not there yet
+    updateRing(100);
+    if (ringPct) ringPct.textContent = "100%";
+    if (ringSub) ringSub.textContent = "Complete";
+    setFetchState("complete");
+    await sleep(650);
+  }else if(mode==="stopped"){
+    if (ringSub) ringSub.textContent = "Stopped";
+    setFetchState("stopped");
+    await sleep(600);
+  }
+  showLoading(false);
+}
+
+/* ================== FETCH FLOW ================== */
 btnFetch?.addEventListener("click",()=>startFetchAll());
-btnStop?.addEventListener("click",()=>{ state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); });
 
 async function startFetchAll(){
   readFromOffcanvasIfPresent();
@@ -498,38 +698,13 @@ async function startFetchAll(){
   const n=Math.max(1, Math.min(4, parseInt(concurrencyEl?.value||state.settings.concurrency,10)||2));
   await Promise.all([...Array(n)].map(()=>worker()));
 
-  showLoading(false);
   render();
-  setStatus("Fetch complete.", false);
-}
-function showLoading(flag){
-  progressWrap.classList.toggle("d-none", !flag);
-  if (btnFetch) btnFetch.disabled = flag;
-  if (btnStop)  btnStop.disabled  = !flag;
 
-  if(flag){
-    updateRing(0);
-    ringPct.textContent="0%";
-    ringSub.textContent="Fetching…";
-    fetchDlg.show();
-  }else{
-    fetchDlg.hide();
-  }
-  loadingOverlay?.classList.add("d-none");
+  // Finalize with a brief, satisfying finish before closing
+  await finalizeFetchUI(state.stop ? "stopped" : "complete");
+  setStatus(state.stop ? "Stopped by user." : "Fetch complete.", false);
 }
-function setProgress(pct, done=0, total=0){
-  const p = Math.max(0, Math.min(100, Math.round(pct)));
-  progressBar.style.width=`${p}%`;
-  progressText.textContent=`${p}%`;
-  updateRing(p);
-  ringPct.textContent = `${p}%`;
-  if(total){ ringSub.textContent = `${done} / ${total}`; }
-}
-function updateRing(p){
-  if(!ringFg) return;
-  const off = 100 - p;
-  ringFg.style.strokeDashoffset = String(off);
-}
+
 
 async function fetchOne(id){
   const url=`https://api.torn.com/user/${encodeURIComponent(id)}?selections=basic,profile&key=${encodeURIComponent(state.apiKey)}`;
@@ -705,7 +880,7 @@ document.addEventListener("click",(e)=>{
     startFetchAll();
     return;
   }
-  if(act==="fetch-stop"){ e.preventDefault(); state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); return; }
+  if(act==="fetch-stop"){ e.preventDefault(); state.stop=true; setStatus("Stopping…", false); setFetchState("stopped"); if (ringSub) ringSub.textContent="Stopping…"; return; }
   if(act==="about"){ e.preventDefault(); btnAbout?.click(); return; }
   if(act==="theme-auto"){ setTheme("auto", true); return; }
   if(act==="theme-light"){ setTheme("light", true); return; }

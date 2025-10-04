@@ -444,29 +444,81 @@ Name [998877]"
       </div>
     </div>
 
-    <!-- Fetch (progress) Modal — SVG ring -->
-    <div class="modal fade" id="fetchDlg" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content glass">
-          <div class="modal-body py-4 text-center">
-            <div class="ring-wrap mx-auto mb-3">
-              <svg class="ring-svg" viewBox="0 0 120 120" aria-hidden="true">
-                <circle class="ring-bg" cx="60" cy="60" r="52"/>
-                <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52" pathLength="100"/>
-              </svg>
-              <div class="ring-label">
-                <div id="ringPct" class="h4 mb-0">0%</div>
-                <div id="ringSub" class="small text-secondary">Fetching…</div>
-              </div>
+<!-- Fetch (progress) Modal — BRILLIANT version -->
+<div class="modal fade" id="fetchDlg" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content glass fetch-modal">
+      <div class="modal-body py-4 text-center">
+
+        <!-- Hero header -->
+        <div class="fetch-hero mb-3">
+          <div class="small text-secondary">Live status from Torn</div>
+        </div>
+
+        <!-- Ring -->
+        <div class="ring-wrap mx-auto mb-3">
+          <svg class="ring-svg" viewBox="0 0 120 120" aria-hidden="true">
+            <!-- defs: gradient for foreground stroke -->
+            <defs>
+              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%"  stop-color="#38bdf8"/>
+                <stop offset="100%" stop-color="#60a5fa"/>
+              </linearGradient>
+            </defs>
+
+            <!-- ticks (subtle dial) -->
+            <circle class="ring-ticks" cx="60" cy="60" r="52"/>
+
+            <!-- track -->
+            <circle class="ring-bg" cx="60" cy="60" r="52"/>
+
+            <!-- progress -->
+            <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52" pathLength="100" stroke="url(#ringGrad)"/>
+          </svg>
+
+          <!-- center label -->
+          <div class="ring-label">
+            <div id="ringPct" class="h3 mb-0 fw-bold">0%</div>
+            <div id="ringSub" class="small text-secondary">Preparing…</div>
+            <div id="ringIcon" class="ring-icon d-none" aria-hidden="true">
+              <i class="bi bi-check2-circle"></i>
             </div>
-            <div class="text-secondary small">We’re pulling live status from Torn. This happens on your device.</div>
-          </div>
-          <div class="modal-footer justify-content-center">
-            <button id="fetchCancel" class="btn btn-ghost"><i class="bi bi-stop-circle me-1"></i> Stop</button>
           </div>
         </div>
+
+        <!-- Stats -->
+        <div class="fetch-stats mx-auto">
+          <div class="stat glass">
+            <div class="label">Progress</div>
+            <div class="value"><span id="statDone">0</span> / <span id="statTotal">0</span></div>
+          </div>
+          <div class="stat glass">
+            <div class="label">Rate</div>
+            <div class="value"><span id="statRate">0</span>/s</div>
+          </div>
+          <div class="stat glass">
+            <div class="label">Elapsed</div>
+            <div class="value"><span id="statElapsed">0s</span></div>
+          </div>
+          <div class="stat glass">
+            <div class="label">ETA</div>
+            <div class="value"><span id="statEta">—</span></div>
+          </div>
+        </div>
+
+        <!-- Footnote -->
+        <div class="text-secondary small mt-3">Everything runs locally on your device.</div>
+      </div>
+
+      <div class="modal-footer justify-content-center gap-2">
+        <button id="fetchCancel" class="btn btn-ghost">
+          <i class="bi bi-stop-circle me-1"></i> Stop
+        </button>
       </div>
     </div>
+  </div>
+</div>
+
 
     <!-- API info Modal -->
     <div class="modal fade keymodal" id="apiKeyInfoDlg" tabindex="-1" aria-hidden="true">

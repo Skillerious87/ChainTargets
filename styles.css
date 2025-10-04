@@ -378,20 +378,114 @@ th.sortable.sort-desc::after{ border-top-color: rgba(0,0,0,.75); }
   line-height: 1.2;
 }
 
-/* Fetch modal — clean glow (no square) */
-.ring-wrap{ position:relative; width:160px; height:160px; }
-.ring-svg{ width:160px; height:160px; display:block; margin:auto; }
-.ring-bg{ fill:none; stroke: var(--ring-track); stroke-width: 12; }
-.ring-fg{
-  fill:none; stroke: var(--ring-fg); stroke-width:12; stroke-linecap:round;
-  transform: rotate(-90deg); transform-origin: 60px 60px;
-  stroke-dasharray:100; stroke-dashoffset:100;
-  transition: stroke-dashoffset .28s ease;
-  filter: drop-shadow(0 12px 36px var(--ring-glow));
+/* ===== Fetch modal — Brilliant look ===== */
+.fetch-modal .modal-body{ position: relative; }
+.fetch-hero{
+  display:inline-block;
+  padding:.25rem .65rem;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background: linear-gradient(180deg, rgba(125,211,252,.10), rgba(125,211,252,.04));
 }
+
+/* Ring */
+.ring-wrap{
+  --ring-size: 180px;
+  width: var(--ring-size);
+  height: var(--ring-size);
+  position: relative;
+  /* removed outer drop-shadow to prevent boxy glow */
+  /* filter: drop-shadow(0 10px 30px rgba(14,165,233,.22)); */
+}
+.ring-svg{
+  width: 100%;
+  height: 100%;
+  display:block;
+}
+.ring-bg{
+  fill:none;
+  stroke: var(--ring-track);
+  stroke-width: 12;
+}
+.ring-ticks{
+  fill:none;
+  stroke: rgba(125,211,252,.16);
+  stroke-width: 1.5;
+  stroke-dasharray: 1 11.5; /* dotted dial */
+  transform: rotate(-90deg);
+  transform-origin: 60px 60px;
+}
+.ring-fg{
+  fill:none;
+  stroke-width:12;
+  stroke-linecap:round;
+  transform: rotate(-90deg);
+  transform-origin: 60px 60px;
+  stroke-dasharray:100;
+  stroke-dashoffset:100;
+  transition: stroke-dashoffset .28s ease, stroke .3s ease;
+  /* removed drop-shadow that caused outer glow box */
+  /* filter: drop-shadow(0 14px 40px var(--ring-glow)); */
+}
+
+/* Center label + success icon */
 .ring-label{
   position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
   text-align:center; pointer-events:none;
+}
+.ring-icon{
+  font-size: 1.6rem;
+  color: #34d399;
+  margin-top:.15rem;
+}
+
+/* Inner glow overlay (masked to the donut) */
+.ring-glow{
+  fill:none;
+  stroke-width:14;            /* slightly thicker for a soft inner glow */
+  stroke-linecap:round;
+  opacity:.55;
+  stroke-dasharray:0 100;     /* JS updates this to match progress */
+  stroke-dashoffset:100;
+  animation: glowPulse 1.8s ease-in-out infinite; /* animated glow */
+}
+
+/* Gentle breathing of the inner glow */
+@keyframes glowPulse {
+  0%,100% { opacity:.35 }
+  50%     { opacity:.85 }
+}
+
+
+/* Stats grid */
+.fetch-stats{
+  width: min(420px, 90%);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.fetch-stats .stat{
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  backdrop-filter: saturate(115%) blur(6px);
+}
+.fetch-stats .label{
+  font-size: .7rem;
+  font-weight: 800; letter-spacing:.2px; opacity:.85; margin-bottom:2px;
+}
+.fetch-stats .value{
+  font-weight: 700; line-height: 1.2;
+}
+
+/* States (completed / stopped) */
+.fetch-modal.is-complete .ring-fg{ stroke:#34d399 !important; filter: drop-shadow(0 16px 44px rgba(52,211,153,.35)); }
+.fetch-modal.is-stopped  .ring-fg{ stroke:#f59e0b !important; filter: drop-shadow(0 16px 44px rgba(245,158,11,.35)); }
+.fetch-modal.is-stopped  #ringIcon{ color:#f59e0b; }
+
+/* Small screens: make stats 2x2 */
+@media (max-width: 420px){
+  .fetch-stats{ grid-template-columns: repeat(2,1fr); }
 }
 
 /* API key modal styling */
@@ -574,7 +668,6 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
     opacity: .9;
   }
 }
-
 /* Pointer cursor on whole card rows */
 #grid tbody tr { cursor: pointer; }
 .table-modern tbody tr:hover { cursor: pointer; }
