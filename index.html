@@ -23,7 +23,6 @@
     <header class="topbar sticky-top" id="appTopbar">
       <div class="container-fluid d-flex align-items-center justify-content-between gap-2 py-2">
         <div class="d-flex align-items-center gap-2">
-          <!-- Mobile sidebar trigger -->
           <button
             class="btn btn-sm btn-ghost d-lg-none"
             data-bs-toggle="offcanvas"
@@ -45,7 +44,6 @@
           </div>
         </div>
 
-        <!-- Toolbar -->
         <nav class="toolbar">
           <button id="btn-open" class="btn btn-ghost">
             <i class="bi bi-folder2-open me-1"></i><span class="btn-label">Open</span>
@@ -61,7 +59,6 @@
             <i class="bi bi-stop-fill me-1"></i><span class="btn-label">Stop</span>
           </button>
 
-          <!-- Theme -->
           <div class="dropdown">
             <button class="btn btn-ghost dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Theme">
               <i class="bi bi-circle-half me-1"></i><span class="btn-label">Theme</span>
@@ -73,7 +70,6 @@
             </ul>
           </div>
 
-          <!-- About -->
           <button id="btn-about" class="btn btn-ghost">
             <i class="bi bi-info-circle me-1"></i><span class="btn-label">About</span>
           </button>
@@ -81,7 +77,7 @@
       </div>
     </header>
 
-    <!-- Main layout (fixed height; only table scrolls) -->
+    <!-- Main layout (table-only scrolling) -->
     <main class="container-fluid py-3 main-shell">
       <div class="row g-3 h-100">
         <!-- Sidebar (desktop) -->
@@ -137,13 +133,13 @@
                 </div>
 
                 <div class="d-flex gap-2 mt-2 flex-wrap">
-                  <button id="btn-bulk" class="btn btn-ghost btn-sm">
+                  <button id="btn-bulk" class="btn btn-ghost btn-sm card-action">
                     <i class="bi bi-card-list me-1"></i> Bulk add
                   </button>
-                  <button id="btn-remove" class="btn btn-ghost btn-sm">
+                  <button id="btn-remove" class="btn btn-ghost btn-sm card-action">
                     <i class="bi bi-trash3 me-1"></i> Remove selected
                   </button>
-                  <button id="btn-clear" class="btn btn-ghost btn-sm text-danger ms-auto">
+                  <button id="btn-clear" class="btn btn-ghost btn-sm text-danger ms-auto card-action">
                     <i class="bi bi-x-lg me-1"></i> Clear all
                   </button>
                 </div>
@@ -181,7 +177,6 @@
               </div>
             </section>
 
-            <!-- Privacy note (desktop) -->
             <div class="privacy-tile glass anim-in">
               <i class="bi bi-shield-lock"></i>
               <div>
@@ -276,7 +271,6 @@
                     </thead>
                     <tbody id="tbody"></tbody>
                   </table>
-                  <!-- Filtered-empty overlay -->
                   <div id="tableEmpty" class="table-empty d-none">
                     <div class="p-4 text-center">
                       <div class="fw-semibold">No rows match your filters</div>
@@ -285,7 +279,7 @@
                   </div>
                 </div>
 
-                <!-- (Overlay kept for safety but we now use the Fetch modal) -->
+                <!-- (Overlay kept for safety; modal is primary during fetch) -->
                 <div id="loadingOverlay" class="loading-overlay d-none">
                   <div class="text-center">
                     <div class="spinner-border text-info mb-2" role="status"></div>
@@ -313,7 +307,6 @@
       </div>
     </div>
 
-    <!-- Hidden file input -->
     <input id="file" type="file" accept=".json" hidden />
 
     <!-- Add Target Modal -->
@@ -380,14 +373,17 @@ Name [998877]"></textarea>
       </div>
     </div>
 
-    <!-- Fetch (progress) Modal -->
+    <!-- Fetch (progress) Modal — SVG ring -->
     <div class="modal fade" id="fetchDlg" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass">
           <div class="modal-body py-4 text-center">
             <div class="ring-wrap mx-auto mb-3">
-              <div id="ringProgress" class="ring-progress" style="--pct:0%"></div>
-              <div class="ring-center">
+              <svg class="ring-svg" viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52" pathLength="100"/>
+              </svg>
+              <div class="ring-label">
                 <div id="ringPct" class="h4 mb-0">0%</div>
                 <div id="ringSub" class="small text-secondary">Fetching…</div>
               </div>
@@ -460,13 +456,11 @@ Name [998877]"></textarea>
       </div>
     </div>
 
-    <!-- Bootstrap JS -->
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
-    <!-- App JS -->
     <script src="app.js"></script>
   </body>
 </html>

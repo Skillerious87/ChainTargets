@@ -1,9 +1,5 @@
-/* Torn Targets — Bootstrap-only premium UI
-   - Table-only scrolling (page fixed)
-   - Progress bar revamped + Fetch modal with radial animation
-   - Theme toggle, About (“By Skillerious”), username→ID resolution
-*/
-const APP_VERSION = "2.4.0";
+/* Torn Targets UI — crisp fetch ring, hover states, rounded table */
+const APP_VERSION = "2.4.1";
 const STORE_KEY = "tornTargets.data.v2";
 const KEY_KEY   = "tornTargets.apiKey.v1";
 const ABOUT_TORN_ID = "3212954";
@@ -11,8 +7,8 @@ const ABOUT_TORN_ID = "3212954";
 /* ---------- State ---------- */
 const state = {
   apiKey: "",
-  targets: /** @type {string[]} */ ([]),
-  results: /** @type {Record<string, any>} */ ({}),
+  targets: [],
+  results: {},
   settings: { concurrency: 2, throttleMs: 1500, useProxy: false, proxyUrl: "" },
   sort: { key: "id", dir: 1 },
   stop: false
@@ -58,7 +54,7 @@ const bulkConfirmLegacy=$("#bulkConfirmLegacy");
 /* Fetch modal */
 const fetchDlgEl = $("#fetchDlg");
 const fetchDlg   = new bootstrap.Modal(fetchDlgEl);
-const ringEl     = $("#ringProgress");
+const ringFg     = $("#ringFg");
 const ringPct    = $("#ringPct");
 const ringSub    = $("#ringSub");
 $("#fetchCancel")?.addEventListener("click", ()=>{ state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); });
@@ -84,6 +80,24 @@ const THEME_KEY="theme";
 document.querySelectorAll(".theme-choice").forEach(btn=>{
   btn.addEventListener("click",()=>setTheme(btn.dataset.theme||"auto", true));
 });
+function setTheme(mode, persistChoice){
+  const root = document.documentElement;
+  if(mode==="auto"){
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    root.setAttribute("data-bs-theme", prefersDark ? "dark" : "light");
+  } else {
+    root.setAttribute("data-bs-theme", mode);
+  }
+  if(persistChoice) localStorage.setItem(THEME_KEY, mode);
+}
+function initTheme(){
+  const mode = localStorage.getItem(THEME_KEY) || "dark";
+  setTheme(mode, false);
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{
+    const m = localStorage.getItem(THEME_KEY)||"auto";
+    if(m==="auto") setTheme("auto", false);
+  });
+}
 
 /* ---------- Utils ---------- */
 const sleep =(ms)=>new Promise(r=>setTimeout(r,ms));
@@ -128,26 +142,8 @@ function saveKeyMaybe(){
   if(rememberKeyEl.checked && state.apiKey) localStorage.setItem(KEY_KEY,state.apiKey);
   else localStorage.removeItem(KEY_KEY);
 }
-function setTheme(mode, persistChoice){
-  const root = document.documentElement;
-  if(mode==="auto"){
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    root.setAttribute("data-bs-theme", prefersDark ? "dark" : "light");
-  } else {
-    root.setAttribute("data-bs-theme", mode);
-  }
-  if(persistChoice) localStorage.setItem(THEME_KEY, mode);
-}
-function initTheme(){
-  const mode = localStorage.getItem(THEME_KEY) || "dark";
-  setTheme(mode, false);
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{
-    const m = localStorage.getItem(THEME_KEY)||"auto";
-    if(m==="auto") setTheme("auto", false);
-  });
-}
 
-/* ---------- Layout variables (table-only scroll) ---------- */
+/* ---------- Layout calc (table-only scroll) ---------- */
 function setHeights(){
   const topbar = document.getElementById("appTopbar");
   const h = topbar ? topbar.offsetHeight : 56;
@@ -245,7 +241,7 @@ function updateChipCounts(){
 }
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,(m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 
-/* ---------- Sorting ---------- */
+/* Sorting */
 grid.querySelectorAll("th.sortable").forEach(th=>{
   th.addEventListener("click",()=>{
     const key=th.dataset.sort;
@@ -254,7 +250,7 @@ grid.querySelectorAll("th.sortable").forEach(th=>{
   });
 });
 
-/* ---------- Selection + row click ---------- */
+/* Selection + row click */
 chkAll?.addEventListener("change",()=>{
   tbody.querySelectorAll(".rowchk").forEach(cb=>cb.checked=chkAll.checked);
 });
@@ -272,7 +268,7 @@ tbody.addEventListener("click",(e)=>{
   window.open(`https://www.torn.com/profiles.php?XID=${encodeURIComponent(id)}`,"_blank","noopener");
 });
 
-/* ---------- Filters ---------- */
+/* Filters */
 statusFilterEl.addEventListener("change",()=>{
   chipsWrap.querySelectorAll(".chip").forEach(c=>c.classList.toggle("active", c.dataset.val===statusFilterEl.value || (statusFilterEl.value==="all" && c.dataset.val==="all")));
   render();
@@ -286,7 +282,7 @@ chipsWrap.addEventListener("click",(e)=>{
 });
 searchBoxEl.addEventListener("input",()=>render());
 
-/* ---------- Add / Remove / Clear ---------- */
+/* Add / Remove / Clear */
 btnAddDialog.addEventListener("click",()=>openAddDialog("single"));
 ctaAdd.addEventListener("click",()=>openAddDialog("single"));
 function openAddDialog(tab){
@@ -307,7 +303,6 @@ addConfirm.addEventListener("click",async ()=>{
   const activeTab=document.querySelector("#addTabs .nav-link.active")?.getAttribute("data-bs-target")||"#singleTab";
   const source = activeTab==="#singleTab" ? singleInput.value : bulkText.value;
   let ids = extractIds(source);
-  // try username->ID if single and nothing extracted
   if(activeTab==="#singleTab" && !ids.length && state.apiKey && source.trim()){
     addConfirm.disabled=true; addConfirm.textContent="Resolving…";
     const id = await resolveNameToId(source.trim()).catch(()=>null);
@@ -339,7 +334,7 @@ btnRemove.addEventListener("click",()=>{
 });
 btnClear.addEventListener("click",()=>{ if(confirm("Clear all targets?")){ state.targets=[]; state.results={}; render(); setStatus("Cleared target list.", false);} });
 
-/* ---------- Open/Save ---------- */
+/* Open/Save */
 btnOpen.addEventListener("click",()=>$("#file").click());
 ctaOpen.addEventListener("click",()=>$("#file").click());
 $("#file").addEventListener("change",async(e)=>{
@@ -367,10 +362,10 @@ function importFromJSON(text){
   }catch(e){ console.error(e); alert("Invalid targets JSON."); }
 }
 
-/* ---------- Fetching ---------- */
+/* Fetching */
 btnFetch.addEventListener("click",()=>startFetchAll());
 btnStop.addEventListener("click",()=>{ state.stop=true; setStatus("Stopped by user.", false); fetchDlg.hide(); });
-btnResetCols.addEventListener("click",()=>{ /* placeholder for future column prefs */ });
+btnResetCols.addEventListener("click",()=>{ /* future column prefs */ });
 
 async function startFetchAll(){
   saveKeyMaybe();
@@ -400,30 +395,33 @@ async function startFetchAll(){
   setStatus("Fetch complete.", false);
 }
 function showLoading(flag){
-  // header bar + ring modal
   progressWrap.classList.toggle("d-none", !flag);
   btnFetch.disabled=flag; btnStop.disabled=!flag;
 
   if(flag){
-    ringEl?.style.setProperty("--pct","0%");
+    updateRing(0);
     ringPct.textContent="0%";
     ringSub.textContent="Fetching…";
     fetchDlg.show();
   }else{
     fetchDlg.hide();
   }
-
-  // keep legacy overlay off (we have the modal)
   loadingOverlay.classList.add("d-none");
 }
 function setProgress(pct, done=0, total=0){
   const p = Math.max(0, Math.min(100, Math.round(pct)));
   progressBar.style.width=`${p}%`;
   progressText.textContent=`${p}%`;
-  ringEl?.style.setProperty("--pct", `${p}%`);
+  updateRing(p);
   ringPct.textContent = `${p}%`;
   if(total){ ringSub.textContent = `${done} / ${total}`; }
 }
+function updateRing(p){
+  if(!ringFg) return;
+  const off = 100 - p;
+  ringFg.style.strokeDashoffset = String(off);
+}
+
 async function fetchOne(id){
   const url=`https://api.torn.com/user/${encodeURIComponent(id)}?selections=basic,profile&key=${encodeURIComponent(state.apiKey)}`;
   const finalUrl = state.settings.useProxy && state.settings.proxyUrl
@@ -457,7 +455,7 @@ function renderRow(id){
 }
 function sortTargets(){ state.targets = sortedTargets(); }
 
-/* ---------- Username → ID (best effort) ---------- */
+/* Username → ID */
 async function resolveNameToId(name){
   const url = `https://api.torn.com/torn/?selections=search&key=${encodeURIComponent(state.apiKey)}&search=${encodeURIComponent(name)}`;
   const finalUrl = state.settings.useProxy && state.settings.proxyUrl
@@ -473,7 +471,7 @@ async function resolveNameToId(name){
   }catch{ return null; }
 }
 
-/* ---------- Settings ---------- */
+/* Settings */
 concurrencyEl.addEventListener("change",()=>{
   const v=parseInt(concurrencyEl.value,10);
   state.settings.concurrency=Math.max(1,Math.min(4,isFinite(v)?v:2)); persist();
@@ -487,7 +485,7 @@ proxyUrlEl.addEventListener("change",()=>{ state.settings.proxyUrl=proxyUrlEl.va
 apiKeyEl.addEventListener("change",saveKeyMaybe);
 rememberKeyEl.addEventListener("change",saveKeyMaybe);
 
-/* ---------- Mobile offcanvas: clean id-free clone ---------- */
+/* Offcanvas clone (mobile) */
 const offcanvasEl = document.getElementById("sidebarOffcanvas");
 offcanvasEl?.addEventListener("show.bs.offcanvas", ()=>{
   const src = document.getElementById("sidebar");
@@ -503,7 +501,7 @@ offcanvasEl?.addEventListener("show.bs.offcanvas", ()=>{
   dest.appendChild(frag);
 });
 
-/* ---------- About modal ---------- */
+/* About modal */
 btnAbout?.addEventListener("click", async ()=>{
   aboutVersion.textContent = APP_VERSION;
   aboutThemeLabel.textContent = `Theme: ${localStorage.getItem("theme") || "dark"}`;
@@ -528,14 +526,14 @@ async function ensureAboutAvatar(){
         const data=await res.json();
         if(data?.profile_image) url = data.profile_image;
       }
-    }catch{ /* ignore */ }
+    }catch{}
   }
   if(!url) url = `https://www.torn.com/signature.php?user=${ABOUT_TORN_ID}`;
   aboutAvatar.src = url;
   aboutAvatar.dataset.loaded = "1";
 }
 
-/* ---------- Init ---------- */
+/* Init */
 initTheme();
 setHeights();
 restore();
