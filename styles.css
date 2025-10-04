@@ -1,0 +1,314 @@
+/* =========================================================
+   Premium Bootstrap-only theme for Torn Targets (layout/visuals)
+   Dark + Light via data-bs-theme; full-width fixed status bar
+   Table-only scrolling; Fetch modal ring progress
+   ========================================================= */
+:root{
+  --statusbar-h: 56px;
+  --topbar-h: 56px;            /* set by JS on load/resize */
+  --radius: 16px;
+  --shadow-glass: 0 18px 40px rgba(0,0,0,.45);
+
+  --pad-card: 18px;
+  --pad-field-y: .65rem;
+  --pad-field-x: .85rem;
+
+  --chip-bg: rgba(255,255,255,.06);
+  --chip-hover: rgba(255,255,255,.10);
+}
+
+/* Theme variables — dark */
+:root[data-bs-theme="dark"]{
+  --bg: #0b0e13;
+  --bg-grad:
+    radial-gradient(1200px 700px at 8% -12%, rgba(125,211,252,.14), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, rgba(96,165,250,.10), transparent 60%),
+    radial-gradient(800px 700px at 60% 120%, rgba(0,0,0,.25), transparent 60%),
+    var(--bg);
+  --glass-1: rgba(18, 26, 41, .92);
+  --glass-2: rgba(16, 24, 37, .92);
+  --glass-bar: linear-gradient(180deg, rgba(16,22,34,.96), rgba(16,22,34,.78));
+  --border: #1c2635;
+  --brand: #0ea5e9;
+  --brand-soft: #7dd3fc;
+
+  --tbl-bg: #0f1622;
+  --tbl-color: #eaf1fa;
+  --thead-grad: linear-gradient(180deg,#121a2a,#0f1624);
+}
+
+/* Theme variables — light */
+:root[data-bs-theme="light"]{
+  --bg: #f5f8fc;
+  --bg-grad:
+    radial-gradient(1200px 700px at 8% -12%, rgba(14,165,233,.15), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, rgba(99,102,241,.10), transparent 60%),
+    #f5f8fc;
+  --glass-1: rgba(255,255,255,.88);
+  --glass-2: rgba(255,255,255,.88);
+  --glass-bar: linear-gradient(180deg, rgba(248,250,252,.92), rgba(241,245,249,.86));
+  --border: #d6e0ea;
+  --brand: #0ea5e9;
+  --brand-soft: #0284c7;
+
+  --tbl-bg: rgba(255,255,255,.95);
+  --tbl-color: #0f172a;
+  --thead-grad: linear-gradient(180deg, #eef4fb, #e8f0f8);
+}
+
+/* Body fixed; only the table area scrolls */
+html, body { height: 100%; }
+body { background: var(--bg-grad); overflow: hidden; }
+
+/* ---------- Global animations ---------- */
+@keyframes fadeInUp { from { opacity:0; transform: translateY(6px);} to { opacity:1; transform:none; } }
+@keyframes fadeIn { from{opacity:.6} to{opacity:1} }
+
+.anim-in    { animation: fadeIn .25s ease-out both; }
+.anim-in-up { animation: fadeInUp .28s ease-out both; }
+
+/* Smooth transitions */
+*{ transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+
+/* ---------- Topbar ---------- */
+.topbar{
+  background: var(--glass-bar);
+  backdrop-filter: saturate(115%) blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.toolbar{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.toolbar .btn{ flex:0 0 auto; }
+.btn-label{ display:inline; }
+@media (max-width: 1200px){ .btn-label{ display:none; } }
+
+.brand-emblem{
+  width:34px;height:34px;display:grid;place-items:center;border-radius:10px;
+  background: linear-gradient(180deg, rgba(125,211,252,.18), rgba(125,211,252,.06));
+  border:1px solid rgba(125,211,252,.32);
+  box-shadow: inset 0 0 28px rgba(125,211,252,.16), 0 8px 24px rgba(0,0,0,.2);
+}
+.brand-emblem svg{ width:20px; fill:#3b82f6; opacity:.85 }
+:root[data-bs-theme="light"] .brand-emblem svg{ fill:#0ea5e9; }
+
+/* ---------- Base glass components ---------- */
+.glass{
+  background: linear-gradient(180deg, var(--glass-1), var(--glass-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: saturate(115%) blur(10px);
+}
+.card.glass>.card-body{ padding: var(--pad-card); }
+
+/* ---------- Sidebar polish ---------- */
+.sidebar .card + .card{ margin-top: 14px; }
+.sidebar .form-label{ font-size: .8rem; font-weight: 700; opacity: .9; }
+.sidebar .form-control,
+.sidebar .form-select{
+  border-radius: 12px;
+  padding: var(--pad-field-y) var(--pad-field-x);
+  background-color: rgba(18, 26, 41, .7);
+  border: 1px solid var(--border);
+}
+:root[data-bs-theme="light"] .sidebar .form-control,
+:root[data-bs-theme="light"] .sidebar .form-select{ background-color: rgba(255,255,255,.7); }
+.sidebar .form-control:focus,
+.sidebar .form-select:focus{
+  box-shadow: 0 0 0 2px rgba(125,211,252,.45), 0 0 0 6px rgba(125,211,252,.12);
+  border-color: rgba(125,211,252,.55);
+}
+
+/* Chips */
+.chip{
+  display:inline-flex; align-items:center; gap:.35rem; font-weight:700;
+  padding:.4rem .75rem; border-radius:999px; border:1px solid var(--border);
+  background: var(--chip-bg); user-select:none;
+}
+:root[data-bs-theme="light"] .chip{ background: rgba(0,0,0,.04); }
+.chip:hover{ background: var(--chip-hover); }
+:root[data-bs-theme="light"] .chip:hover{ background: rgba(0,0,0,.07); }
+.chip.active{ box-shadow: 0 0 0 2px rgba(125,211,252,.45), 0 0 0 6px rgba(125,211,252,.12); border-color: rgba(125,211,252,.55); }
+.chip-ok{ border-color: rgba(56,211,159,.35); }
+.chip-hospital{ border-color: rgba(248,113,113,.35);}
+.chip-jail{ border-color: rgba(245,158,11,.35);}
+.chip-travel{ border-color: rgba(96,165,250,.35);}
+.chip-offline{ border-color: rgba(161,161,170,.35);}
+
+/* Privacy tile */
+.privacy-tile{
+  display:flex; align-items:flex-start; gap:.6rem; padding:12px;
+  border-radius: 12px; border:1px dashed var(--border);
+}
+.privacy-tile .bi-shield-lock{ font-size:1.1rem; color: var(--brand); }
+
+/* Offcanvas — premium glass look */
+.offcanvas{
+  --bs-offcanvas-width: 380px;
+  --bs-offcanvas-bg: transparent;
+  background: linear-gradient(180deg, var(--glass-1), var(--glass-2));
+  border-right: 1px solid var(--border);
+  backdrop-filter: saturate(115%) blur(12px);
+  box-shadow: 0 10px 40px rgba(0,0,0,.5);
+}
+.offcanvas-header{ border-bottom:1px solid var(--border); }
+.offcanvas-body{ display:flex; flex-direction:column; gap:12px; }
+#sidebarClone{ flex:1 1 auto; overflow:auto; padding-right:4px; }
+.offcanvas .card.glass{ box-shadow:none; }
+.sticky-bottom-tile{
+  position: sticky; bottom: 0; z-index: 2;
+  background: linear-gradient(180deg, var(--glass-1), var(--glass-2));
+}
+
+/* ---------- Table-only scrolling layout ---------- */
+.main-shell{
+  height: calc(100vh - var(--topbar-h) - var(--statusbar-h));
+  overflow: hidden;
+}
+.board-col{ height: 100%; display:flex; flex-direction:column; min-height:0; }
+.grid-scroll{ flex:1 1 auto; min-height:0; }
+.grid-scroll-body{
+  height: 100%;
+  overflow: auto;
+  /* breathable space above fixed status bar */
+  padding-bottom: calc(var(--statusbar-h) + 16px) !important;
+}
+
+/* ---------- Board / Table ---------- */
+.table-wrap{ position:relative; border-radius: var(--radius); overflow: hidden; }
+
+.table-modern{ --bs-table-bg: var(--tbl-bg); --bs-table-color: var(--tbl-color); }
+.table-modern thead th{
+  position: sticky; top: 0; z-index: 1;
+  background: var(--thead-grad);
+  border-bottom: 1px solid var(--border);
+  font-size: .8rem; letter-spacing: .2px; font-weight: 800;
+  padding: .85rem 1rem;
+}
+.table-modern tbody td{
+  padding: .9rem 1rem;
+  border-bottom-color: rgba(0,0,0,.06) !important;
+}
+:root[data-bs-theme="dark"] .table-modern tbody td{ border-bottom-color: rgba(255,255,255,.06) !important; }
+.table-modern tbody tr:hover{ background: rgba(125,211,252,.08) !important; cursor: pointer; }
+
+/* Sort indicators */
+th.sortable{ cursor:pointer; }
+th.sortable::after{
+  content:""; display:inline-block; margin-left:.4rem;
+  border:.35rem solid transparent; border-top-color: rgba(0,0,0,.45);
+  transform: translateY(.2rem);
+}
+:root[data-bs-theme="dark"] th.sortable::after{ border-top-color: rgba(255,255,255,.45); }
+th.sortable.sort-asc::after{ border-top-color: transparent; border-bottom-color: rgba(0,0,0,.75); }
+:root[data-bs-theme="dark"] th.sortable.sort-asc::after{ border-bottom-color: rgba(255,255,255,.85); }
+th.sortable.sort-desc::after{ border-top-color: rgba(0,0,0,.75); }
+:root[data-bs-theme="dark"] th.sortable.sort-desc::after{ border-top-color: rgba(255,255,255,.85); }
+
+/* Filtered-empty overlay */
+.table-empty{
+  position:absolute; inset: 56px 14px 14px; display:grid; place-items:center;
+  border:1px dashed var(--border); border-radius: var(--radius);
+}
+
+/* Row checkboxes – bigger hit area */
+#grid input[type="checkbox"]{ width: 18px; height: 18px; }
+
+/* ---------- Progress bar (header) ---------- */
+.progress-hero{
+  width: 240px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(125,211,252,.16);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(14,165,233,.15), 0 6px 26px rgba(14,165,233,.18);
+}
+.progress-hero .progress-bar{
+  background-image: linear-gradient(90deg, #38bdf8, #60a5fa);
+}
+
+/* Empty graphic */
+.empty-graphic{ width:240px; color: var(--brand); opacity:.9; filter: drop-shadow(0 8px 40px rgba(14,165,233,.25)); }
+
+/* ---------- Loading overlay (kept but usually hidden) ---------- */
+.loading-overlay{
+  position:absolute; inset:0; display:grid; place-items:center;
+  background: rgba(0,0,0,.35);
+  border-radius: var(--radius);
+  animation: fadeIn .2s ease-out both;
+}
+:root[data-bs-theme="light"] .loading-overlay{ background: rgba(0,0,0,.12); }
+
+/* ---------- Full-width Status Bar ---------- */
+.statusbar-fixed{
+  position: fixed; left:0; right:0; bottom:0; z-index: 1050;
+  height: var(--statusbar-h);
+  background: var(--glass-bar);
+  border-top: 1px solid var(--border);
+  backdrop-filter: saturate(115%) blur(10px);
+  display:flex; align-items:center;
+}
+.status-dot{
+  width:10px; height:10px; border-radius:999px; background:#36d39f;
+  box-shadow:0 0 0 3px rgba(54,211,159,.18);
+}
+
+/* ---------- About modal ---------- */
+.about-modal .modal-header{ border-bottom: 1px solid var(--border); }
+.about-hero{
+  background:
+    radial-gradient(600px 220px at 50% -10%, rgba(14,165,233,.25), transparent 60%),
+    linear-gradient(180deg, var(--glass-1), var(--glass-2));
+  border-bottom: 1px solid var(--border);
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+}
+.avatar-xl{
+  width:84px; height:84px; border-radius:50%;
+  object-fit: cover; object-position: center;
+  border:2px solid rgba(125,211,252,.35);
+  background: radial-gradient(60% 60% at 40% 35%, rgba(255,255,255,.25), transparent);
+}
+
+/* ---------- Fetch modal ring progress ---------- */
+.ring-wrap{ position:relative; width:140px; height:140px; }
+.ring-progress{
+  width:140px; height:140px; border-radius:50%;
+  background:
+    conic-gradient(#38bdf8 var(--pct), rgba(255,255,255,.08) 0);
+  box-shadow: 0 12px 48px rgba(56,189,248,.28);
+  display:grid; place-items:center;
+}
+.ring-progress::before{
+  content:""; width:104px; height:104px; border-radius:50%;
+  background: linear-gradient(180deg, var(--glass-1), var(--glass-2));
+  border:1px solid var(--border);
+  box-shadow: inset 0 0 22px rgba(0,0,0,.25);
+}
+.ring-center{
+  position:absolute; inset:0; display:grid; place-items:center;
+  text-align:center;
+}
+
+/* ---------- Scrollbars (WebKit) ---------- */
+.table-responsive::-webkit-scrollbar,
+.grid-scroll-body::-webkit-scrollbar,
+body::-webkit-scrollbar{ height:12px; width:12px; }
+.table-responsive::-webkit-scrollbar-thumb,
+.grid-scroll-body::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb{
+  background:#1b2533; border:3px solid transparent; border-radius:10px; background-clip:padding-box;
+}
+:root[data-bs-theme="light"] .table-responsive::-webkit-scrollbar-thumb,
+:root[data-bs-theme="light"] .grid-scroll-body::-webkit-scrollbar-thumb,
+:root[data-bs-theme="light"] body::-webkit-scrollbar-thumb{ background:#c9d6e4; }
+.table-responsive::-webkit-scrollbar-thumb:hover,
+.grid-scroll-body::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover{ background:#273246; }
+:root[data-bs-theme="light"] .table-responsive::-webkit-scrollbar-thumb:hover,
+:root[data-bs-theme="light"] .grid-scroll-body::-webkit-scrollbar-thumb:hover,
+:root[data-bs-theme="light"] body::-webkit-scrollbar-thumb:hover{ background:#b6c6d9; }
+
+/* ---------- Entrance effects ---------- */
+.card.glass{ animation: fadeInUp .22s ease-out both; }
+.table-modern tbody tr{ animation: fadeIn .2s ease-out both; }
