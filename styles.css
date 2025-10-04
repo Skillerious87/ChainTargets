@@ -481,3 +481,25 @@ body::-webkit-scrollbar-thumb:hover{ background:#273246; }
   }
   .cell-last .bi{ opacity:.8; }
 }
+/* --- Desktop-only spacing (alignment-safe) --- */
+@media (min-width: 769px) {
+  /* Keep table rows aligned vertically without changing layout model */
+  .table-modern tbody td{ vertical-align: middle; }
+
+  /* Subtle gap between avatar and username without flex */
+  #grid .cell-name .avatar{
+    margin-right: 0.5rem;   /* ~8px space */
+    vertical-align: middle; /* keeps baseline tidy with the text */
+  }
+  #grid .cell-name .name-text{
+    vertical-align: middle;
+  }
+
+  /* Subtle gap between clock icon and last-action text (no flex) */
+  #grid .cell-last .bi{
+    margin-right: 0.45rem;  /* ~7px space */
+    position: relative;
+    top: 1px;               /* tiny optical alignment */
+    opacity: .9;
+  }
+}
