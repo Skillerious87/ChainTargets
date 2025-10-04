@@ -1,5 +1,5 @@
 /* Target Tracker UI — table + mobile cards + brilliant fetch dialog + mobile actions */
-const APP_VERSION = "2.5.1";
+const APP_VERSION = "2.5.2";
 const STORE_KEY = "tornTargets.data.v2";
 const KEY_KEY   = "tornTargets.apiKey.v1";
 const ABOUT_TORN_ID = "3212954";
@@ -460,7 +460,7 @@ function importFromJSON(text){
 const fetchDlgEl = $("#fetchDlg");
 const fetchDlg   = new bootstrap.Modal(fetchDlgEl);
 const ringFg     = $("#ringFg");
-const ringGlow   = $("#ringGlow");
+const ringInnerGlow = $("#ringInnerGlow");
 const ringPct    = $("#ringPct");
 const ringSub    = $("#ringSub");
 const ringIcon   = $("#ringIcon");
@@ -504,14 +504,12 @@ function showLoading(flag){
   if (btnStop)  btnStop.disabled  = !flag;
 
   if(flag){
-    // reset UI
     updateRing(0);
     if (ringPct) ringPct.textContent="0%";
     if (ringSub) ringSub.textContent="Preparing…";
     if (ringIcon) ringIcon.classList.add("d-none");
-    if (ringGlow){
-      ringGlow.style.strokeDashoffset = "100";  // same math as ringFg
-      // dasharray already 100 from CSS
+    if (ringInnerGlow){
+      ringInnerGlow.style.strokeDashoffset = "100";
     }
     setFetchState("fetching");
     resetStats();
@@ -538,10 +536,8 @@ function initFetchStats(total){
 /* Progress + Stats */
 function setProgress(pct, done=0, total=0){
   const p = Math.max(0, Math.min(100, Math.round(pct)));
-  // header bar
   progressBar.style.width=`${p}%`;
   progressText.textContent=`${p}%`;
-  // ring
   updateRing(p);
   if (ringPct) ringPct.textContent = `${p}%`;
 
@@ -553,11 +549,11 @@ function setProgress(pct, done=0, total=0){
   }
 }
 
-/* Smooth ring update + inner glow sync (same dash math => no 4 o'clock dot) */
+/* Smooth ring update + inner glow sync (same dash math) */
 function updateRing(p){
   const off = 100 - p;
-  if (ringFg){   ringFg.style.strokeDashoffset = String(off); }
-  if (ringGlow){ ringGlow.style.strokeDashoffset = String(off); }
+  if (ringFg)        ringFg.style.strokeDashoffset = String(off);
+  if (ringInnerGlow) ringInnerGlow.style.strokeDashoffset = String(off);
 }
 
 /* Stats helpers (smoothed) */
